@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using LogisticaBroker.Data;
+using LogisticaBroker.Repositories;
+using LogisticaBroker.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +12,9 @@ builder.Services.AddSwaggerGen();
 // Conexión a PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Repository Pattern — registrar aquí
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 var app = builder.Build();
 
