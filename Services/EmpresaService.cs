@@ -8,10 +8,12 @@ namespace LogisticaBroker.Services;
 public class EmpresaService
 {
     private readonly AppDbContext _context;
+    private readonly EmailService _emailService; // 🔹 NUEVO
 
-    public EmpresaService(AppDbContext context)
+    public EmpresaService(AppDbContext context, EmailService emailService)
     {
         _context = context;
+        _emailService = emailService;
     }
 
     public async Task RegistrarEmpresaAsync(Empresa empresa)
@@ -28,7 +30,7 @@ public class EmpresaService
         _context.Empresas.Add(empresa);
         await _context.SaveChangesAsync();
 
-        // 🔹 Generar contraseña temporal (8 caracteres)
+        // 🔹 Generar contraseña temporal
         var password = Guid.NewGuid().ToString("N").Substring(0, 8);
 
         // 🔹 Crear usuario
@@ -38,41 +40,37 @@ public class EmpresaService
             Correo = empresa.Correo,
             ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(password),
             IdEmpresa = empresa.IdEmpresa,
-            IdRol = 1, // ⚠️ Debe existir en BD
+            IdRol = 1,
             Estado = "Activo"
         };
 
         _context.Usuarios.Add(usuario);
-        await _context.SaveChangesAsync(); // ✅ IMPORTANTE: aquí se genera IdUsuario
+        await _context.SaveChangesAsync(); // 🔹 genera IdUsuario
 
-        // 🔹 Registrar log de notificación
-        var notificacion = new NotificacionEmail
-        {
-            CorreoDestino = empresa.Correo,
-            Asunto = "Bienvenido a LogisticaBroker",
-            PlantillaUsada = "Bienvenida",
-            EstadoEnvio = "Pendiente"
-        };
-
-        //_context.NotificacionesEmail.Add(notificacion);
-
-        // 🔹 Auditoría (ahora sí con usuario válido)
+        // 🔹 Auditoría
         var auditoria = new Auditoria
         {
             TablaAfectada = "Empresa",
             Accion = "INSERT",
             FechaHora = DateTime.UtcNow,
-            IdUsuario = usuario.IdUsuario // ✅ CLAVE
+            IdUsuario = usuario.IdUsuario
         };
 
         _context.Auditorias.Add(auditoria);
 
         await _context.SaveChangesAsync();
 
-        // 🔹 Simulación de envío de correo (async)
-        _ = Task.Run(() =>
-        {
-            Console.WriteLine($"Correo enviado a {empresa.Correo} con clave {password}");
-        });
+        //  T19: ENVIAR CORREO AUTOMÁTICO
+        var html = _emailService.GenerarPlantillaBienvenida(
+            usuario.NombreCompleto,
+            usuario.Correo,
+            password
+        );
+
+        await _emailService.EnviarCorreoAsync(
+            usuario.Correo,
+            "Bienvenido a LogisticaBroker 🚀",
+            html
+        );
     }
 }
