@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using LogisticaBroker.Data;
-using LogisticaBroker.Services; // 👈 IMPORTANTE (tu carpeta Services)
+using LogisticaBroker.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +15,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // 🔹 Registro de servicios (TU HU01)
 builder.Services.AddScoped<EmpresaService>();
+builder.Services.AddScoped<EmailService>(); // 👈 ESTE FALTABA
 
 var app = builder.Build();
 
