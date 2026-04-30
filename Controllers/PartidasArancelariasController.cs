@@ -1,8 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using LogisticaBroker.Data;
 using LogisticaBroker.DTOs;
 using LogisticaBroker.Models;
+using LogisticaBroker.Repositories.Interfaces;
 
 namespace LogisticaBroker.Controllers;
 
@@ -10,87 +9,72 @@ namespace LogisticaBroker.Controllers;
 [Route("api/despachos/{idDespacho:int}/partidas")]
 public class PartidasArancelariasController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IUnitOfWork _uow;
 
-    public PartidasArancelariasController(AppDbContext context)
+    public PartidasArancelariasController(IUnitOfWork uow)
     {
-        _context = context;
+        _uow = uow;
     }
 
     // ─────────────────────────────────────────────────────────
     // GET api/despachos/{idDespacho}/partidas
-    // Lista todas las partidas de un despacho
     // ─────────────────────────────────────────────────────────
     [HttpGet]
     public async Task<IActionResult> ObtenerPartidas(int idDespacho)
     {
-        // Verificar que el despacho existe
-        var despacho = await _context.Despachos
-            .FirstOrDefaultAsync(d => d.IdDespacho == idDespacho);
-
+        var despacho = await _uow.Despachos.GetByIdAsync(idDespacho);
         if (despacho is null)
             return NotFound(new { mensaje = "Despacho no encontrado" });
 
-        // Buscar la DAM del despacho
-        var dam = await _context.Dams
-            .FirstOrDefaultAsync(d => d.IdDespacho == idDespacho);
-
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho);
         if (dam is null)
             return NotFound(new { mensaje = "Este despacho aún no tiene una DAM generada" });
 
-        // Obtener las partidas de esa DAM
-        var partidas = await _context.PartidasArancelarias
-            .Where(p => p.IdDam == dam.IdDam)
-            .Select(p => new PartidaArancelariaResponseDto
-            {
-                IdPartida            = p.IdPartida,
-                IdDam                = p.IdDam,
-                PartidaNacional      = p.PartidaNacional,
-                SubpartidaNaban      = p.SubpartidaNaban,
-                CantidadBultos       = p.CantidadBultos,
-                PesoNetoKg           = p.PesoNetoKg,
-                PesoBrutoKg          = p.PesoBrutoKg,
-                DescripcionMercancias = p.DescripcionMercancias
-            })
-            .ToListAsync();
+        var partidas = await _uow.Partidas.GetByDamAsync(dam.IdDam);
 
-        return Ok(partidas);
+        var respuesta = partidas.Select(p => new PartidaArancelariaResponseDto
+        {
+            IdPartida             = p.IdPartida,
+            IdDam                 = p.IdDam,
+            PartidaNacional       = p.PartidaNacional,
+            SubpartidaNaban       = p.SubpartidaNaban,
+            CantidadBultos        = p.CantidadBultos,
+            PesoNetoKg            = p.PesoNetoKg,
+            PesoBrutoKg           = p.PesoBrutoKg,
+            DescripcionMercancias = p.DescripcionMercancias
+        });
+
+        return Ok(respuesta);
     }
 
     // ─────────────────────────────────────────────────────────
-    // POST api/despachos/{idDespacho}/partidas
-    // Asignar una nueva partida arancelaria — HU09
+    // POST api/despachos/{idDespacho}/partidas — HU09
     // ─────────────────────────────────────────────────────────
     [HttpPost]
     public async Task<IActionResult> AsignarPartida(int idDespacho, [FromBody] CrearPartidaArancelariaDto dto)
     {
-        // 1. Validar que el DTO es correcto (los 10 dígitos, etc.)
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        // 2. Verificar que el despacho existe
-        var despacho = await _context.Despachos
-            .FirstOrDefaultAsync(d => d.IdDespacho == idDespacho);
-
+        // 1. Verificar que el despacho existe
+        var despacho = await _uow.Despachos.GetByIdAsync(idDespacho);
         if (despacho is null)
             return NotFound(new { mensaje = "Despacho no encontrado" });
 
-        // 3. Verificar que el despacho está en estado "En Apertura" — HU09 criterio 1
+        // 2. Verificar estado del despacho — HU09 criterio 1
         if (despacho.Estado != "En proceso")
             return BadRequest(new { mensaje = "Solo se pueden asignar partidas a despachos en estado 'En proceso'" });
 
-        // 4. Verificar que existe una DAM para este despacho
-        var dam = await _context.Dams
-            .FirstOrDefaultAsync(d => d.IdDespacho == idDespacho);
-
+        // 3. Verificar que existe una DAM
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho);
         if (dam is null)
             return BadRequest(new { mensaje = "Este despacho no tiene una DAM generada. Primero genera el borrador de DAM" });
 
-        // 5. Verificar que la DAM no está bloqueada
+        // 4. Verificar que la DAM no está bloqueada
         if (dam.EdicionBloqueada)
             return BadRequest(new { mensaje = "La DAM está finalizada y no permite más cambios" });
 
-        // 6. Crear la partida arancelaria
+        // 5. Crear la partida
         var partida = new PartidaArancelaria
         {
             IdDam                 = dam.IdDam,
@@ -102,21 +86,22 @@ public class PartidasArancelariasController : ControllerBase
             DescripcionMercancias = dto.DescripcionMercancias
         };
 
-        _context.PartidasArancelarias.Add(partida);
+        await _uow.Partidas.AddAsync(partida);
 
-        // 7. Marcar la etapa correspondiente como "Clasificado" — HU09 criterio 2
-        var etapaClasificacion = await _context.EtapasDespacho
-            .FirstOrDefaultAsync(e => e.IdDespacho == idDespacho && e.IdTipoEtapa == 2); // Transmisión DUA
+        // 6. Marcar etapa como "Clasificado" — HU09 criterio 2
+        var despachoConEtapas = await _uow.Despachos.GetDespachoConEtapasAsync(idDespacho);
+        var etapa = despachoConEtapas?.Etapas
+            .FirstOrDefault(e => e.IdTipoEtapa == 2); // Transmisión DUA
 
-        if (etapaClasificacion is not null)
+        if (etapa is not null)
         {
-            etapaClasificacion.Estado    = "Clasificado";
-            etapaClasificacion.FechaHora = DateTime.UtcNow;
+            etapa.Estado    = "Clasificado";
+            etapa.FechaHora = DateTime.UtcNow;
+            _uow.Despachos.Update(despachoConEtapas!);
         }
 
-        await _context.SaveChangesAsync();
+        await _uow.SaveChangesAsync();
 
-        // 8. Responder con la partida creada
         var respuesta = new PartidaArancelariaResponseDto
         {
             IdPartida             = partida.IdPartida,
@@ -134,28 +119,25 @@ public class PartidasArancelariasController : ControllerBase
 
     // ─────────────────────────────────────────────────────────
     // DELETE api/despachos/{idDespacho}/partidas/{idPartida}
-    // Eliminar una partida arancelaria
     // ─────────────────────────────────────────────────────────
     [HttpDelete("{idPartida:int}")]
     public async Task<IActionResult> EliminarPartida(int idDespacho, int idPartida)
     {
-        var dam = await _context.Dams
-            .FirstOrDefaultAsync(d => d.IdDespacho == idDespacho);
-
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho);
         if (dam is null)
             return NotFound(new { mensaje = "DAM no encontrada para este despacho" });
 
         if (dam.EdicionBloqueada)
             return BadRequest(new { mensaje = "La DAM está finalizada y no permite eliminar partidas" });
 
-        var partida = await _context.PartidasArancelarias
-            .FirstOrDefaultAsync(p => p.IdPartida == idPartida && p.IdDam == dam.IdDam);
+        var partidas = await _uow.Partidas.GetByDamAsync(dam.IdDam);
+        var partida  = partidas.FirstOrDefault(p => p.IdPartida == idPartida);
 
         if (partida is null)
             return NotFound(new { mensaje = "Partida no encontrada" });
 
-        _context.PartidasArancelarias.Remove(partida);
-        await _context.SaveChangesAsync();
+        _uow.Partidas.Delete(partida);
+        await _uow.SaveChangesAsync();
 
         return Ok(new { mensaje = "Partida eliminada correctamente" });
     }
