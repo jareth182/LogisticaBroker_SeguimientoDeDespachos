@@ -19,4 +19,10 @@ public class EmpresaRepository : Repository<Empresa>, IEmpresaRepository
 
     public async Task<bool> ExisteRucAsync(string ruc) =>
         await _context.Empresas.AnyAsync(e => e.Ruc == ruc);
+
+    public async Task<IEnumerable<Empresa>> BuscarPorRucORazonSocialAsync(string termino) =>
+        await _context.Empresas
+            .Where(e => e.Ruc.Contains(termino) || e.RazonSocial.Contains(termino))
+            .Take(10) // Limitamos a 10 resultados para no sobrecargar el selector
+            .ToListAsync();
 }
