@@ -31,4 +31,10 @@ public class DespachoRepository : Repository<Despacho>, IDespachoRepository
                 .ThenInclude(e => e.TipoEtapa)
             .Include(d => d.Canal)
             .FirstOrDefaultAsync(d => d.IdDespacho == idDespacho);
+    
+    public async Task<string?> ObtenerUltimoCodigoOrdenAsync() =>
+        await _context.Despachos
+            .OrderByDescending(d => d.IdDespacho)
+            .Select(d => d.CodigoOrden)
+            .FirstOrDefaultAsync();
 }
