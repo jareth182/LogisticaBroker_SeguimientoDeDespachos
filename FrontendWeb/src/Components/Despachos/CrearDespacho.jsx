@@ -21,15 +21,16 @@ export default function CrearDespacho({ onCreated }) {
 
     const API_BASE_URL = 'http://localhost:5018/api/Despachos';
 
-    // Búsqueda en tiempo real de clientes (T30)
+    // Búsqueda en tiempo real de clientes (autocompletar)
     useEffect(() => {
         const buscarClientes = async () => {
-            if (busqueda.length < 3) {
+            // buscar desde 1 carácter para autocompletar rápido
+            if (busqueda.length < 1) {
                 setClientes([]);
                 return;
             }
             try {
-                const response = await fetch(`${API_BASE_URL}/clientes/buscar?termino=${busqueda}`);
+                const response = await fetch(`${API_BASE_URL}/clientes/buscar?termino=${encodeURIComponent(busqueda)}`);
                 if (response.ok) {
                     const data = await response.json();
                     setClientes(data);
@@ -38,7 +39,7 @@ export default function CrearDespacho({ onCreated }) {
                 console.error("Error API:", error);
             }
         };
-        const timeoutId = setTimeout(() => buscarClientes(), 300);
+        const timeoutId = setTimeout(() => buscarClientes(), 250);
         return () => clearTimeout(timeoutId);
     }, [busqueda]);
 
@@ -48,37 +49,68 @@ export default function CrearDespacho({ onCreated }) {
         setClientes([]);
     };
 
+    const isValidBl = (bl) => {
+        if (!bl) return false;
+        const v = bl.trim().toUpperCase().replace(/\s+/g, '');
+        // Formato estricto: 4 letras (carrier) + 7 dígitos, ej. MSCU1234567
+        return /^[A-Z]{4}\d{7}$/.test(v);
+    };
+
     // Envío de la Historia de Usuario (T31)
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMensaje(null);
         setLoading(true);
 
-        if (!clienteSeleccionado) {
-            setMensaje({ tipo: 'error', texto: 'Por favor, busca y selecciona un cliente de la lista.' });
-            setLoading(false);
-            return;
+        // Si no hay cliente seleccionado, intentar resolver una coincidencia desde el backend
+        let clienteAUsar = clienteSeleccionado;
+        if (!clienteAUsar) {
+            try {
+                if (!busqueda || busqueda.trim().length < 1) {
+                    setMensaje({ tipo: 'error', texto: 'Por favor, busca y selecciona un cliente de la lista.' });
+                    setLoading(false);
+                    return;
+                }
+                const resp = await fetch(`${API_BASE_URL}/clientes/buscar?termino=${encodeURIComponent(busqueda)}`);
+                if (resp.ok) {
+                    const candidats = await resp.json();
+                    // Si existe una coincidencia exacta, úsala; si sólo hay una opción, úsala también
+                    const exact = candidats.find(c => `${c.razonSocial} (${c.ruc})`.toLowerCase() === busqueda.toLowerCase() || c.ruc === busqueda || c.razonSocial.toLowerCase() === busqueda.toLowerCase());
+                    if (exact) clienteAUsar = exact;
+                    else if (candidats.length === 1) clienteAUsar = candidats[0];
+                    else {
+                        setMensaje({ tipo: 'error', texto: 'No se pudo resolver el cliente. Selecciónalo de la lista desplegable.' });
+                        setLoading(false);
+                        return;
+                    }
+                } else {
+                    setMensaje({ tipo: 'error', texto: 'Error buscando cliente en el servidor.' });
+                    setLoading(false);
+                    return;
+                }
+            } catch (err) {
+                setMensaje({ tipo: 'error', texto: 'Error de conexión al buscar cliente.' });
+                setLoading(false);
+                return;
+            }
         }
 
         try {
-            // Nota: Enviamos solo lo que tu backend soporta actualmente (idEmpresa y codigoBl).
-            // Los demás campos del diseño están listos para cuando tu backend crezca.
+            const normalizedBl = codigoBl.trim().toUpperCase().replace(/\s+/g, '');
             const response = await fetch(API_BASE_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    idEmpresa: clienteSeleccionado.idEmpresa,
-                    codigoBl: codigoBl.toUpperCase()
+                    idEmpresa: clienteAUsar.idEmpresa,
+                    codigoBl: normalizedBl
                 })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                setMensaje({ tipo: 'exito', texto: `¡Despacho ${data.codigoOrden} creado exitosamente con el BL ${codigoBl.toUpperCase()}!` });
-                // Notificar al componente padre (ej. para refrescar lista)
+                setMensaje({ tipo: 'exito', texto: `¡Despacho ${data.codigoOrden} creado exitosamente con el BL ${normalizedBl}!` });
                 if (onCreated) onCreated(data);
-                // Limpiar formulario completo
                 setCodigoBl('');
                 setBusqueda('');
                 setClienteSeleccionado(null);
@@ -155,12 +187,15 @@ export default function CrearDespacho({ onCreated }) {
                             <label className="block text-xs font-semibold text-gray-700 mb-1.5">Número de Bill of Lading (BL) <span className="text-red-500">*</span></label>
                             <input 
                                 type="text" 
-                                required
                                 value={codigoBl}
-                                onChange={(e) => setCodigoBl(e.target.value)}
+                                onChange={(e) => setCodigoBl(e.target.value.toUpperCase())}
                                 placeholder="Ej. MSCU1234567" 
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-[#008b9c] focus:ring-1 focus:ring-[#008b9c] outline-none uppercase transition-all" 
                             />
+                            {/* Validación simple del BL: mínimo 7 caracteres alfanuméricos */}
+                            {codigoBl && !isValidBl(codigoBl) && (
+                                <p className="text-xs text-red-600 mt-1">Formato BL inválido. Debe ser 4 letras seguidas de 7 dígitos (ej. MSCU1234567).</p>
+                            )}
                         </div>
 
                         {/* Tipo de Carga */}
@@ -226,8 +261,9 @@ export default function CrearDespacho({ onCreated }) {
                         </button>
                         <button 
                             type="submit" 
-                            disabled={loading} 
-                            className={`px-6 py-2.5 bg-[#008b9c] hover:bg-[#007685] rounded-md text-sm font-semibold text-white shadow-sm transition-colors flex items-center gap-2 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                            disabled={loading || !isValidBl(codigoBl)}
+                            title={!isValidBl(codigoBl) ? 'BL inválido' : 'Crear despacho'}
+                            className={`px-6 py-2.5 bg-[#008b9c] hover:bg-[#007685] rounded-md text-sm font-semibold text-white shadow-sm transition-colors flex items-center gap-2 ${loading || !isValidBl(codigoBl) ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                             {loading && <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
                             {loading ? 'Procesando...' : 'Crear Despacho'}

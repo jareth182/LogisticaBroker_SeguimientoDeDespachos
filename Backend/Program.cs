@@ -28,6 +28,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Repository Pattern — registrar aquí
+builder.Services.AddScoped<IDespachoRepository, DespachoRepository>();
+builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 // Repositorios individuales
 builder.Services.AddScoped<IDespachoRepository, DespachoRepository>();

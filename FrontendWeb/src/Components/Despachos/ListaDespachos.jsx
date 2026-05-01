@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 const API_BASE_URL = 'http://localhost:5018/api/Despachos';
 
-export default function ListaDespachos() {
+export default function ListaDespachos({ refreshKey = 0 }) {
     const [despachos, setDespachos] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -23,7 +23,8 @@ export default function ListaDespachos() {
 
     useEffect(() => {
         fetchDespachos();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshKey]);
 
     const formatDate = (iso) => {
         try {
@@ -48,7 +49,7 @@ export default function ListaDespachos() {
                 <div className="flex items-center gap-3">
                     <button onClick={fetchDespachos} className="px-3 py-2 bg-[#008b9c] text-white rounded text-sm font-semibold">{loading ? 'Cargando...' : 'Refrescar'}</button>
                 </div>
-                <div className="text-sm text-gray-500">Total: {despachos.length}</div>
+                <div className="text-sm text-gray-500">Total: {Array.isArray(despachos) ? despachos.length : 0}</div>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
