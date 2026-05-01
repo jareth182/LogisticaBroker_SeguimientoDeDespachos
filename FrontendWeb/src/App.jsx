@@ -4,12 +4,38 @@ import CrearDespacho from './Components/Despachos/CrearDespacho';
 import ListaDespachos from './Components/Despachos/ListaDespachos';
 
 export default function App() {
+  const [usuario, setUsuario] = useState(null);
   const [view, setView] = useState('crear');
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebarCollapsed') === 'true'; } catch { return false; }
   });
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState({ show: false, title: '', message: '', type: 'success' });
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('usuario');
+    if (token && userData) {
+      setUsuario(JSON.parse(userData));
+    }
+  }, []);
+
+  const handleLoginExitoso = (usuarioData) => {
+    setUsuario(usuarioData);
+    if (usuarioData.rol === 'Cliente') {
+      setView('trazabilidad');
+    } else {
+      setView('crear');
+    }
+  };
+
+  const handleLogout = async () => {
+    await fetch('http://localhost:5018/api/Auth/logout', { method: 'POST' });
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    setUsuario(null);
+    setView('crear');
+  };
 
   const handleCreated = (data) => {
     setRefreshKey(k => k + 1);
@@ -30,6 +56,17 @@ export default function App() {
     try { localStorage.setItem('sidebarCollapsed', value ? 'true' : 'false'); } catch {}
     setIsCollapsed(value);
   };
+
+  if (!usuario) {
+    return <Login onLoginExitoso={handleLoginExitoso} />;
+  }
+
+  const iniciales = usuario.nombreCompleto
+    ?.split(' ')
+    .slice(0, 2)
+    .map(n => n[0])
+    .join('')
+    .toUpperCase() || 'U';
 
   return (
     <div className="flex h-screen bg-[#f8fafc] font-sans overflow-hidden">
@@ -64,15 +101,20 @@ export default function App() {
         {/* Footer sidebar */}
         <div className="p-4 border-t border-gray-800 bg-[#0d1b2a]">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-[#008b9c] flex items-center justify-center text-xs font-bold">JD</div>
+            <div className="w-8 h-8 rounded-full bg-[#008b9c] flex items-center justify-center text-xs font-bold">
+              {iniciales}
+            </div>
             {!isCollapsed && (
               <div>
-                <p className="text-sm font-medium">Juan Díaz</p>
-                <p className="text-xs text-gray-400">Agente Aduanal</p>
+                <p className="text-sm font-medium">{usuario.nombreCompleto}</p>
+                <p className="text-xs text-gray-400">{usuario.rol}</p>
               </div>
             )}
           </div>
-          <button className={`w-full flex items-center justify-center gap-2 bg-[#ff3b30] hover:bg-red-600 text-white py-2 rounded text-sm font-medium transition-colors ${isCollapsed ? 'px-2' : ''}`}>
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center justify-center gap-2 bg-[#ff3b30] hover:bg-red-600 text-white py-2 rounded text-sm font-medium transition-colors ${isCollapsed ? 'px-2' : ''}`}
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
             {!isCollapsed && 'Cerrar sesión'}
           </button>
