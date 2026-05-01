@@ -1,98 +1,117 @@
-using LogisticaBroker.Data;
+using LogisticaBroker.DTOs;
 using LogisticaBroker.Models;
+using LogisticaBroker.Repositories.Interfaces;
 
 namespace LogisticaBroker.Services;
 
 public class DAMService
 {
-    private readonly AppDbContext _context;
+    private readonly IUnitOfWork _uow;
 
-    public DAMService(AppDbContext context)
+    public DAMService(IUnitOfWork uow)
     {
-        _context = context;
+        _uow = uow;
     }
 
-    public async Task<DAMResponse> GenerarBorradorAsync(DAMRequest request)
+    // ─────────────────────────────────────────────────────────
+    // POST /api/DAM/generar-borrador
+    // ─────────────────────────────────────────────────────────
+    public async Task<DamResponseDto> GenerarBorradorAsync(CrearDamDto dto)
     {
-        // Validaciones básicas
-        var validaciones = ValidarDAMRequest(request);
-        if (validaciones.Any())
-        {
-            return new DAMResponse
-            {
-                Estado = "Error",
-                Validaciones = validaciones
-            };
-        }
+        // 1. Verificar que el despacho existe
+        var despacho = await _uow.Despachos.GetByIdAsync(dto.IdDespacho)
+            ?? throw new KeyNotFoundException("Despacho no encontrado");
 
-        // Generar número DAM único
-        var numeroDAM = await GenerarNumeroDAMAsync();
+        // 2. Verificar que no tenga ya una DAM
+        var damExistente = await _uow.Dams.GetByDespachoAsync(dto.IdDespacho);
+        if (damExistente is not null)
+            throw new InvalidOperationException(
+                "Este despacho ya tiene una DAM generada");
 
-        // TODO: Implementar lógica real de generación de DAM
-        var damResponse = new DAMResponse
+        // 3. Crear la DAM
+        var dam = new Dam
         {
-            DAMId = new Random().Next(1000, 9999),
-            NumeroDAM = numeroDAM,
-            Estado = "Borrador",
-            FechaGeneracion = DateTime.UtcNow,
-            UrlDocumento = $"/api/dam/{numeroDAM}/documento",
-            Validaciones = new List<string> { "DAM generada correctamente" }
+            IdDespacho              = dto.IdDespacho,
+            IdUsuarioCreador        = dto.IdUsuarioCreador,
+            ImportadorExportador    = dto.ImportadorExportador,
+            CodDocIdentificacion    = dto.CodDocIdentificacion,
+            DireccionImportador     = dto.DireccionImportador,
+            EmpresaTransporte       = dto.EmpresaTransporte,
+            ViaTransporte           = dto.ViaTransporte ?? "Marítimo",
+            PuertoEmbarque          = dto.PuertoEmbarque,
+            TerminalAlmacenamiento  = dto.TerminalAlmacenamiento,
+            ValorFob                = dto.ValorFob,
+            Flete                   = dto.Flete,
+            Seguro                  = dto.Seguro,
+            TotalAjustes            = dto.TotalAjustes,
+            Estado                  = "Borrador",
+            EdicionBloqueada        = false,
+            FechaCreacion           = DateTime.UtcNow
         };
 
-        return damResponse;
+        await _uow.Dams.AddAsync(dam);
+        await _uow.SaveChangesAsync();
+
+        return MapToResponseDto(dam);
     }
 
-    public async Task<object> ObtenerBorradorAsync(int id)
+    // ─────────────────────────────────────────────────────────
+    // GET /api/DAM/{idDespacho}/borrador
+    // ─────────────────────────────────────────────────────────
+    public async Task<DamResponseDto> ObtenerBorradorAsync(int idDespacho)
     {
-        // TODO: Implementar lógica real para obtener borrador
-        await Task.CompletedTask;
-        return new
+        var dam = await _uow.Dams.GetDamConPartidasAsync(idDespacho)
+            ?? throw new KeyNotFoundException(
+                "No se encontró una DAM para este despacho");
+
+        return MapToResponseDto(dam);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // POST /api/DAM/{idDespacho}/finalizar
+    // ─────────────────────────────────────────────────────────
+    public async Task<DamResponseDto> FinalizarDAMAsync(int idDespacho)
+    {
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho)
+            ?? throw new KeyNotFoundException(
+                "No se encontró una DAM para este despacho");
+
+        if (dam.EdicionBloqueada)
+            throw new InvalidOperationException(
+                "La DAM ya está finalizada");
+
+        dam.EdicionBloqueada  = true;
+        dam.Estado            = "Finalizado";
+        dam.FechaFinalizacion = DateTime.UtcNow;
+
+        await _uow.SaveChangesAsync();
+
+        return MapToResponseDto(dam);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Mapeo privado Model → DTO
+    // ─────────────────────────────────────────────────────────
+    private static DamResponseDto MapToResponseDto(Dam d) =>
+        new()
         {
-            Id = id,
-            NumeroDAM = $"DAM-{id}",
-            Estado = "Borrador",
-            FechaGeneracion = DateTime.UtcNow,
-            Contenido = "Contenido del borrador DAM..."
+            IdDam                  = d.IdDam,
+            IdDespacho             = d.IdDespacho,
+            ImportadorExportador   = d.ImportadorExportador,
+            CodDocIdentificacion   = d.CodDocIdentificacion,
+            DireccionImportador    = d.DireccionImportador,
+            EmpresaTransporte      = d.EmpresaTransporte,
+            ViaTransporte          = d.ViaTransporte,
+            PuertoEmbarque         = d.PuertoEmbarque,
+            TerminalAlmacenamiento = d.TerminalAlmacenamiento,
+            ValorFob               = d.ValorFob,
+            Flete                  = d.Flete,
+            Seguro                 = d.Seguro,
+            TotalAjustes           = d.TotalAjustes,
+            ValorCifTotal          = d.ValorCifTotal,
+            Estado                 = d.Estado,
+            EdicionBloqueada       = d.EdicionBloqueada,
+            FechaCreacion          = d.FechaCreacion,
+            FechaFinalizacion      = d.FechaFinalizacion
         };
-    }
-
-    public async Task<object> FinalizarDAMAsync(int id)
-    {
-        // TODO: Implementar lógica real de finalización
-        await Task.CompletedTask;
-        return new
-        {
-            Mensaje = "DAM finalizada correctamente",
-            DAMId = id,
-            Estado = "Finalizada",
-            FechaFinalizacion = DateTime.UtcNow
-        };
-    }
-
-    private List<string> ValidarDAMRequest(DAMRequest request)
-    {
-        var validaciones = new List<string>();
-
-        if (request.DespachoId <= 0)
-            validaciones.Add("ID de despacho inválido");
-
-        if (!request.Items.Any())
-            validaciones.Add("Debe incluir al menos un ítem de mercancía");
-
-        if (string.IsNullOrEmpty(request.Exportador))
-            validaciones.Add("Exportador es requerido");
-
-        if (string.IsNullOrEmpty(request.Importador))
-            validaciones.Add("Importador es requerido");
-
-        return validaciones;
-    }
-
-    private async Task<string> GenerarNumeroDAMAsync()
-    {
-        // TODO: Implementar lógica real de generación
-        var año = DateTime.UtcNow.Year;
-        var correlativo = new Random().Next(10000, 99999);
-        return $"DAM-{año}-{correlativo}";
-    }
 }

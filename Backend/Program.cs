@@ -29,7 +29,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Repository Pattern — registrar aquí
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
+// Repositorios individuales
+builder.Services.AddScoped<IDespachoRepository, DespachoRepository>();
+builder.Services.AddScoped<IDamRepository, DamRepository>();
+builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();
+builder.Services.AddScoped<IPartidaArancelariaRepository, PartidaArancelariaRepository>();
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 // Services
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<CloudStorageService>();
