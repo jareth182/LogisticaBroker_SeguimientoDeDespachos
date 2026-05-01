@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using LogisticaBroker.Data;
 using LogisticaBroker.Repositories;
 using LogisticaBroker.Repositories.Interfaces;
+=========
+using LogisticaBroker.Services;
+>>>>>>>>> Temporary merge branch 2
 
 var builder = WebApplication.CreateBuilder(args);
 
