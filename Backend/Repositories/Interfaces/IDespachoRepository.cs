@@ -8,5 +8,6 @@ public interface IDespachoRepository : IRepository<Despacho>
     Task<IEnumerable<Despacho>> GetByEmpresaAsync(int idEmpresa);
     Task<IEnumerable<Despacho>> GetByEstadoAsync(string estado);
     Task<Despacho?> GetDespachoConEtapasAsync(int idDespacho);
+    Task<IEnumerable<Despacho>> GetAllWithEmpresaAsync();
     Task<string?> ObtenerUltimoCodigoOrdenAsync();
 }
