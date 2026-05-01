@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using LogisticaBroker.Models;
+using LogisticaBroker.DTOs;
 using LogisticaBroker.Services;
 
 namespace LogisticaBroker.Controllers;
@@ -15,31 +15,39 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
+    // ─────────────────────────────────────────────────────────
+    // POST /api/Auth/login — HU28
+    // ─────────────────────────────────────────────────────────
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         try
         {
-            var result = await _authService.LoginAsync(request);
-            return Ok(result);
+            var resultado = await _authService.LoginAsync(dto);
+            return Ok(resultado);
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return Unauthorized(new { mensaje = ex.Message });
         }
     }
 
+    // ─────────────────────────────────────────────────────────
+    // POST /api/Auth/logout
+    // El logout real se maneja en el frontend eliminando el token
+    // ─────────────────────────────────────────────────────────
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public IActionResult Logout()
     {
-        try
-        {
-            await _authService.LogoutAsync();
-            return Ok(new { mensaje = "Sesión cerrada correctamente" });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
+        return Ok(new { mensaje = "Sesión cerrada correctamente" });
     }
+    [HttpGet("hash/{password}")]
+public IActionResult GenerarHash(string password)
+{
+    var hash = BCrypt.Net.BCrypt.HashPassword(password);
+    return Ok(new { hash });
+}
 }

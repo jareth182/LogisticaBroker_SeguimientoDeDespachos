@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Login from './Components/Auth/Login';
 import CrearDespacho from './Components/Despachos/CrearDespacho';
 import ListaDespachos from './Components/Despachos/ListaDespachos';
 
@@ -48,7 +49,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Links del Menú */}
         <nav className="flex-1 overflow-y-auto py-4 space-y-1">
           <NavItem icon="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" text="Dashboard" onClick={() => setView('dashboard')} collapsed={isCollapsed} active={view === 'dashboard'} />
           <NavItem icon="M12 4v16m8-8H4" text="Crear Despacho" onClick={() => setView('crear')} collapsed={isCollapsed} active={view === 'crear'} />
@@ -61,7 +61,7 @@ export default function App() {
           <NavItem icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" text="Configuración" collapsed={isCollapsed} />
         </nav>
 
-        {/* Footer del Sidebar */}
+        {/* Footer sidebar */}
         <div className="p-4 border-t border-gray-800 bg-[#0d1b2a]">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-full bg-[#008b9c] flex items-center justify-center text-xs font-bold">JD</div>
@@ -79,7 +79,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ================= CONTENIDO PRINCIPAL ================= */}
+      {/* ── CONTENIDO PRINCIPAL ── */}
       <main className="flex-1 flex flex-col h-full relative">
         {/* HEADER */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 z-10">
@@ -89,27 +89,25 @@ export default function App() {
             </button>
             <div className="relative flex-1">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
               </span>
-              <input type="text" placeholder="Buscar despachos, clientes, documentos..." className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#008b9c]" />
+              <input type="text" placeholder="Buscar despachos, clientes, documentos..."
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#008b9c]" />
             </div>
           </div>
-          <div className="flex items-center gap-6 ml-4">
-            <button className="relative text-gray-500 hover:text-gray-700">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
-            <div className="flex items-center gap-3 border-l pl-6 border-gray-200">
-              <div className="text-right hidden md:block">
-                <p className="text-sm font-semibold text-gray-800">Juan Díaz</p>
-                <p className="text-xs text-gray-500">Agente Aduanal</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-[#008b9c] flex items-center justify-center text-white text-xs font-bold">JD</div>
+          <div className="flex items-center gap-4 ml-4 border-l pl-6 border-gray-200">
+            <div className="text-right hidden md:block">
+              <p className="text-sm font-semibold text-gray-800">{usuario.nombreCompleto}</p>
+              <p className="text-xs text-gray-500">{usuario.rol}</p>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[#008b9c] flex items-center justify-center text-white text-xs font-bold">
+              {iniciales}
             </div>
           </div>
         </header>
 
-        {/* ÁREA DE SCROLL (Dashboard Content) */}
         <div className="flex-1 overflow-auto p-8">
           {view === 'crear' && (
             <CrearDespacho onCreated={handleCreated} />
@@ -167,31 +165,5 @@ function NavItem({ icon, text, collapsed = false, onClick = () => {}, active = f
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={icon}></path></svg>
       {!collapsed && <span className="text-sm font-medium">{text}</span>}
     </div>
-  );
-}
-
-// Subcomponente reutilizable para las filas de la tabla
-function TableRow({ code, ruc, name, bl, state, stateColor, date }) {
-  return (
-    <tr className="hover:bg-gray-50 transition-colors">
-      <td className="px-6 py-4 font-medium text-gray-900">{code}</td>
-      <td className="px-6 py-4">{ruc}</td>
-      <td className="px-6 py-4">{name}</td>
-      <td className="px-6 py-4">{bl}</td>
-      <td className="px-6 py-4">
-        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${stateColor}`}>
-          {state}
-        </span>
-      </td>
-      <td className="px-6 py-4 text-gray-500">{date}</td>
-      <td className="px-6 py-4 text-center flex justify-center gap-3">
-        <button className="text-gray-400 hover:text-[#008b9c]" title="Ver detalle">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-        </button>
-        <button className="text-gray-400 hover:text-[#008b9c]" title="Actualizar">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-        </button>
-      </td>
-    </tr>
   );
 }
