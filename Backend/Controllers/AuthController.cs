@@ -44,10 +44,4 @@ public class AuthController : ControllerBase
     {
         return Ok(new { mensaje = "Sesión cerrada correctamente" });
     }
-    [HttpGet("hash/{password}")]
-public IActionResult GenerarHash(string password)
-{
-    var hash = BCrypt.Net.BCrypt.HashPassword(password);
-    return Ok(new { hash });
-}
 }
