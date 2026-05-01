@@ -10,10 +10,10 @@ public class LoginResponse
 {
     public string Token { get; set; } = string.Empty;
     public DateTime Expiracion { get; set; }
-    public Usuario Usuario { get; set; } = new();
+    public AuthUsuario Usuario { get; set; } = new();
 }
 
-public class Usuario
+public class AuthUsuario
 {
     public int Id { get; set; }
     public string Nombre { get; set; } = string.Empty;

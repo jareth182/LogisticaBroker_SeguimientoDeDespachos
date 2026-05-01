@@ -1,3 +1,4 @@
+using LogisticaBroker.Data;
 using LogisticaBroker.Models;
 
 namespace LogisticaBroker.Services;

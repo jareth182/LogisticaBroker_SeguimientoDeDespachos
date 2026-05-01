@@ -10,7 +10,7 @@ public class AsignacionPartidaRequest
     public string Justificacion { get; set; } = string.Empty;
 }
 
-public class PartidaArancelaria
+public class PartidaArancelariaInfo
 {
     public string Codigo { get; set; } = string.Empty;
     public string Descripcion { get; set; } = string.Empty;
@@ -25,7 +25,7 @@ public class AsignacionResponse
 {
     public bool Exitosa { get; set; }
     public string Mensaje { get; set; } = string.Empty;
-    public PartidaArancelaria PartidaAsignada { get; set; } = new();
+    public PartidaArancelariaInfo PartidaAsignada { get; set; } = new();
     public List<string> Alertas { get; set; } = new();
     public List<string> Recomendaciones { get; set; } = new();
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using LogisticaBroker.Data;
 using LogisticaBroker.Repositories;
 using LogisticaBroker.Repositories.Interfaces;
+using LogisticaBroker.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Repository Pattern — registrar aquí
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Services
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<CloudStorageService>();
+builder.Services.AddScoped<ContratoService>();
+builder.Services.AddScoped<DAMService>();
+builder.Services.AddScoped<DespachoService>();
+builder.Services.AddScoped<PartidaArancelariaService>();
+builder.Services.AddScoped<TrazabilidadService>();
 
 var app = builder.Build();
 

@@ -1,3 +1,4 @@
+using LogisticaBroker.Data;
 using LogisticaBroker.Models;
 
 namespace LogisticaBroker.Services;
@@ -50,7 +51,7 @@ public class PartidaArancelariaService
         return response;
     }
 
-    public async Task<PartidaArancelaria> BuscarPartidaAsync(string codigo)
+    public async Task<PartidaArancelariaInfo> BuscarPartidaAsync(string codigo)
     {
         var partida = await BuscarPartidaArancelariaAsync(codigo);
         return partida;
@@ -78,15 +79,15 @@ public class PartidaArancelariaService
         };
     }
 
-    private async Task<PartidaArancelaria> BuscarPartidaArancelariaAsync(string codigo)
+    private async Task<PartidaArancelariaInfo> BuscarPartidaArancelariaAsync(string codigo)
     {
         // TODO: Implementar búsqueda real en base de datos o API externa
         await Task.CompletedTask;
         
         // Simulación de búsqueda
-        var partidasSimuladas = new Dictionary<string, PartidaArancelaria>
+        var partidasSimuladas = new Dictionary<string, PartidaArancelariaInfo>
         {
-            ["8471.30.00.00"] = new PartidaArancelaria
+            ["8471.30.00.00"] = new PartidaArancelariaInfo
             {
                 Codigo = "8471.30.00.00",
                 Descripcion = "Máquinas automáticas para procesamiento de datos",
@@ -96,7 +97,7 @@ public class PartidaArancelariaService
                 Sinonimos = new List<string> { "computadoras", "equipos de procesamiento", "hardware" },
                 NotasExplicativas = "Incluye computadoras personales, servidores y equipos periféricos"
             },
-            ["8517.12.00.00"] = new PartidaArancelaria
+            ["8517.12.00.00"] = new PartidaArancelariaInfo
             {
                 Codigo = "8517.12.00.00",
                 Descripcion = "Teléfonos celulares y otros aparatos de red inalámbrica",

@@ -1,3 +1,4 @@
+using LogisticaBroker.Data;
 using LogisticaBroker.Models;
 
 namespace LogisticaBroker.Services;
@@ -22,7 +23,7 @@ public class AuthService
         }
 
         // Simulación de búsqueda de usuario
-        var usuario = new Usuario
+        var usuario = new AuthUsuario
         {
             Id = 1,
             Nombre = "Usuario Demo",

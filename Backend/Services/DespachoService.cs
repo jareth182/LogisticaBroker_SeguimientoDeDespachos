@@ -1,4 +1,6 @@
+using LogisticaBroker.Data;
 using LogisticaBroker.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace LogisticaBroker.Services;
 
@@ -13,8 +15,8 @@ public class DespachoService
 
     public async Task<Despacho> CrearDespachoAsync(Despacho despacho)
     {
-        // Generar número de despacho único
-        despacho.NumeroDespacho = await GenerarNumeroDespachoAsync();
+        // Generar código de despacho único
+        despacho.CodigoOrden = await GenerarCodigoOrdenAsync();
         despacho.FechaCreacion = DateTime.UtcNow;
         despacho.Estado = "Borrador";
 
@@ -41,7 +43,7 @@ public class DespachoService
             .ToListAsync();
     }
 
-    private async Task<string> GenerarNumeroDespachoAsync()
+    private async Task<string> GenerarCodigoOrdenAsync()
     {
         // TODO: Implementar lógica real de generación de número
         var año = DateTime.UtcNow.Year;
