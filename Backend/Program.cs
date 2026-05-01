@@ -23,6 +23,8 @@ builder.Services.AddScoped<CloudStorageService>();
 builder.Services.AddScoped<ContratoService>();
 builder.Services.AddScoped<DAMService>();
 builder.Services.AddScoped<DespachoService>();
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<EmpresaService>();
 builder.Services.AddScoped<PartidaArancelariaService>();
 builder.Services.AddScoped<TrazabilidadService>();
 
