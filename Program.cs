@@ -13,9 +13,16 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 🔹 Registro de servicios (TU HU01)
+// 🔹 Registro de servicios
 builder.Services.AddScoped<EmpresaService>();
-builder.Services.AddScoped<EmailService>(); // 👈 ESTE FALTABA
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<DespachoService>();
+builder.Services.AddScoped<DAMService>();
+builder.Services.AddScoped<TrazabilidadService>();
+builder.Services.AddScoped<PartidaArancelariaService>();
+builder.Services.AddScoped<ContratoService>();
+builder.Services.AddScoped<CloudStorageService>();
 
 var app = builder.Build();
 
