@@ -1,25 +1,33 @@
 using Microsoft.EntityFrameworkCore;
 using LogisticaBroker.Data;
+using LogisticaBroker.Repositories;
+using LogisticaBroker.Repositories.Interfaces;
 using LogisticaBroker.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 🔹 Controllers + Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// 🔹 Conexión a PostgreSQL
+// Conexión a PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 🔹 Registro de servicios (TU HU01)
-builder.Services.AddScoped<EmpresaService>();
-builder.Services.AddScoped<EmailService>(); // 👈 ESTE FALTABA
+// Repository Pattern — registrar aquí
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Services
+builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<CloudStorageService>();
+builder.Services.AddScoped<ContratoService>();
+builder.Services.AddScoped<DAMService>();
+builder.Services.AddScoped<DespachoService>();
+builder.Services.AddScoped<PartidaArancelariaService>();
+builder.Services.AddScoped<TrazabilidadService>();
 
 var app = builder.Build();
 
-// 🔹 Swagger solo en desarrollo
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -27,10 +35,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
-// 🔹 Mapear controladores
 app.MapControllers();
-
 app.Run();
