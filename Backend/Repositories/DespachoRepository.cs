@@ -37,4 +37,10 @@ public class DespachoRepository : Repository<Despacho>, IDespachoRepository
             .OrderByDescending(d => d.IdDespacho)
             .Select(d => d.CodigoOrden)
             .FirstOrDefaultAsync();
+
+    public async Task<IEnumerable<Despacho>> GetAllWithEmpresaAsync() =>
+        await _context.Despachos
+            .Include(d => d.Empresa)
+            .OrderByDescending(d => d.FechaCreacion)
+            .ToListAsync();
 }

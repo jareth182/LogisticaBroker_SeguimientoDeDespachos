@@ -1,119 +1,125 @@
-using LogisticaBroker.Data;
+using LogisticaBroker.DTOs;
 using LogisticaBroker.Models;
+using LogisticaBroker.Repositories.Interfaces;
 
 namespace LogisticaBroker.Services;
 
 public class PartidaArancelariaService
 {
-    private readonly AppDbContext _context;
+    private readonly IUnitOfWork _uow;
 
-    public PartidaArancelariaService(AppDbContext context)
+    public PartidaArancelariaService(IUnitOfWork uow)
     {
-        _context = context;
+        _uow = uow;
     }
 
-    public async Task<AsignacionResponse> AsignarPartidaAsync(AsignacionPartidaRequest request)
+    // ─────────────────────────────────────────────────────────
+    // HU09 — Asignar partida arancelaria
+    // ─────────────────────────────────────────────────────────
+    public async Task<PartidaArancelariaResponseDto> AsignarPartidaAsync(
+        int idDespacho, CrearPartidaArancelariaDto dto)
     {
-        // Buscar la partida arancelaria
-        var partida = await BuscarPartidaArancelariaAsync(request.CodigoPartida);
-        
-        var response = new AsignacionResponse
+        // 1. Verificar que el despacho existe
+        var despacho = await _uow.Despachos.GetByIdAsync(idDespacho)
+            ?? throw new KeyNotFoundException("Despacho no encontrado");
+
+        // 2. Verificar estado del despacho — HU09 criterio 1
+        if (despacho.Estado != "En Apertura")
+            throw new InvalidOperationException(
+                "Solo se pueden asignar partidas a despachos en estado 'En Apertura'");
+
+        // 3. Verificar que existe una DAM
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho)
+            ?? throw new InvalidOperationException(
+                "Este despacho no tiene una DAM generada. Primero genera el borrador de DAM");
+
+        // 4. Verificar que la DAM no está bloqueada
+        if (dam.EdicionBloqueada)
+            throw new InvalidOperationException(
+                "La DAM está finalizada y no permite más cambios");
+
+        // 5. Crear y guardar la partida
+        var partida = new PartidaArancelaria
         {
-            Exitosa = true,
-            Mensaje = "Partida arancelaria asignada correctamente",
-            PartidaAsignada = partida,
-            Alertas = new List<string>(),
-            Recomendaciones = new List<string>()
+            IdDam                 = dam.IdDam,
+            PartidaNacional       = dto.PartidaNacional,
+            SubpartidaNaban       = dto.SubpartidaNaban,
+            CantidadBultos        = dto.CantidadBultos,
+            PesoNetoKg            = dto.PesoNetoKg,
+            PesoBrutoKg           = dto.PesoBrutoKg,
+            DescripcionMercancias = dto.DescripcionMercancias
         };
 
-        // Validaciones y recomendaciones
-        if (partida.PorcentajeArancel > 20)
+        await _uow.Partidas.AddAsync(partida);
+
+        // 6. Marcar etapa como "Clasificado" — HU09 criterio 2
+        var despachoConEtapas = await _uow.Despachos.GetDespachoConEtapasAsync(idDespacho);
+        var etapa = despachoConEtapas?.Etapas
+            .FirstOrDefault(e => e.IdTipoEtapa == 2); // Transmisión DUA
+
+        if (etapa is not null)
         {
-            response.Alertas.Add("Esta partida tiene un arancel alto (>20%)");
+            etapa.Estado    = "Clasificado";
+            etapa.FechaHora = DateTime.UtcNow;
+            _uow.Despachos.Update(despachoConEtapas!);
         }
 
-        if (string.IsNullOrEmpty(request.Justificacion))
-        {
-            response.Recomendaciones.Add("Agregar justificación detallada para la asignación");
-        }
+        await _uow.SaveChangesAsync();
 
-        // TODO: Guardar en base de datos
-        // var asignacion = new PartidaDespacho
-        // {
-        //     DespachoId = request.DespachoId,
-        //     ItemMercanciaId = request.ItemMercanciaId,
-        //     CodigoPartida = request.CodigoPartida,
-        //     // ... otras propiedades
-        // };
-        // _context.PartidasDespacho.Add(asignacion);
-        // await _context.SaveChangesAsync();
-
-        return response;
+        return MapToResponseDto(partida);
     }
 
-    public async Task<PartidaArancelariaInfo> BuscarPartidaAsync(string codigo)
+    // ─────────────────────────────────────────────────────────
+    // Obtener todas las partidas de un despacho
+    // ─────────────────────────────────────────────────────────
+    public async Task<IEnumerable<PartidaArancelariaResponseDto>> ObtenerPartidasAsync(
+        int idDespacho)
     {
-        var partida = await BuscarPartidaArancelariaAsync(codigo);
-        return partida;
+        var despacho = await _uow.Despachos.GetByIdAsync(idDespacho)
+            ?? throw new KeyNotFoundException("Despacho no encontrado");
+
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho)
+            ?? throw new KeyNotFoundException(
+                "Este despacho aún no tiene una DAM generada");
+
+        var partidas = await _uow.Partidas.GetByDamAsync(dam.IdDam);
+
+        return partidas.Select(MapToResponseDto);
     }
 
-    public async Task<List<PartidaDespacho>> ObtenerPartidasDespachoAsync(int id)
+    // ─────────────────────────────────────────────────────────
+    // Eliminar una partida
+    // ─────────────────────────────────────────────────────────
+    public async Task EliminarPartidaAsync(int idDespacho, int idPartida)
     {
-        // TODO: Implementar lógica real con base de datos
-        await Task.CompletedTask;
-        
-        return new List<PartidaDespacho>
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho)
+            ?? throw new KeyNotFoundException("DAM no encontrada para este despacho");
+
+        if (dam.EdicionBloqueada)
+            throw new InvalidOperationException(
+                "La DAM está finalizada y no permite eliminar partidas");
+
+        var partidas = await _uow.Partidas.GetByDamAsync(dam.IdDam);
+        var partida  = partidas.FirstOrDefault(p => p.IdPartida == idPartida)
+            ?? throw new KeyNotFoundException("Partida no encontrada");
+
+        _uow.Partidas.Delete(partida);
+        await _uow.SaveChangesAsync();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Mapeo privado Model → DTO
+    // ─────────────────────────────────────────────────────────
+    private static PartidaArancelariaResponseDto MapToResponseDto(PartidaArancelaria p) =>
+        new()
         {
-            new()
-            {
-                Id = 1,
-                DespachoId = id,
-                ItemMercanciaId = 1,
-                CodigoPartida = "8471.30.00.00",
-                DescripcionPartida = "Máquinas automáticas para procesamiento de datos",
-                PorcentajeArancel = 0,
-                FechaAsignacion = DateTime.UtcNow,
-                AsignadoPor = "Jareth",
-                Estado = "Confirmado"
-            }
+            IdPartida             = p.IdPartida,
+            IdDam                 = p.IdDam,
+            PartidaNacional       = p.PartidaNacional,
+            SubpartidaNaban       = p.SubpartidaNaban,
+            CantidadBultos        = p.CantidadBultos,
+            PesoNetoKg            = p.PesoNetoKg,
+            PesoBrutoKg           = p.PesoBrutoKg,
+            DescripcionMercancias = p.DescripcionMercancias
         };
-    }
-
-    private async Task<PartidaArancelariaInfo> BuscarPartidaArancelariaAsync(string codigo)
-    {
-        // TODO: Implementar búsqueda real en base de datos o API externa
-        await Task.CompletedTask;
-        
-        // Simulación de búsqueda
-        var partidasSimuladas = new Dictionary<string, PartidaArancelariaInfo>
-        {
-            ["8471.30.00.00"] = new PartidaArancelariaInfo
-            {
-                Codigo = "8471.30.00.00",
-                Descripcion = "Máquinas automáticas para procesamiento de datos",
-                PorcentajeArancel = 0,
-                Categoria = "Equipos de cómputo",
-                Subcategoria = "Computadoras",
-                Sinonimos = new List<string> { "computadoras", "equipos de procesamiento", "hardware" },
-                NotasExplicativas = "Incluye computadoras personales, servidores y equipos periféricos"
-            },
-            ["8517.12.00.00"] = new PartidaArancelariaInfo
-            {
-                Codigo = "8517.12.00.00",
-                Descripcion = "Teléfonos celulares y otros aparatos de red inalámbrica",
-                PorcentajeArancel = 15,
-                Categoria = "Equipos de comunicación",
-                Subcategoria = "Telefonía móvil",
-                Sinonimos = new List<string> { "smartphones", "teléfonos móviles", "celulares" },
-                NotasExplicativas = "Incluye smartphones y otros dispositivos móviles con conexión a redes"
-            }
-        };
-
-        if (partidasSimuladas.TryGetValue(codigo, out var partida))
-        {
-            return partida;
-        }
-
-        throw new KeyNotFoundException($"Partida arancelaria con código {codigo} no encontrada");
-    }
 }
