@@ -59,6 +59,9 @@ public class ContratoService
         // Generar PDF firmado (simulado)
         var contratoFirmado = await GenerarPDFContratoAsync(contrato);
 
+        // Actualizar estado de la empresa a "Afiliado Activo"
+        await ActualizarEstadoEmpresaAsync(contrato.EmpresaId);
+
         // TODO: Guardar cambios en base de datos
         // await _context.SaveChangesAsync();
 
@@ -117,5 +120,20 @@ public class ContratoService
         // TODO: Implementar generación real de PDF
         await Task.CompletedTask;
         return $"pdf_firmado_base64_{Guid.NewGuid()}";
+    }
+
+    private async Task ActualizarEstadoEmpresaAsync(int empresaId)
+    {
+        // TODO: Implementar actualización real del estado de la empresa
+        await Task.CompletedTask;
+        
+        // Simulación: Cambiar estado a "Afiliado Activo"
+        // En la implementación real:
+        // var empresa = await _context.Empresas.FindAsync(empresaId);
+        // if (empresa != null)
+        // {
+        //     empresa.Estado = "Afiliado Activo";
+        //     await _context.SaveChangesAsync();
+        // }
     }
 }
