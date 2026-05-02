@@ -195,7 +195,7 @@ export default function App() {
           )}
 
           {view === 'documentos' && (
-            <Documentos />
+            <Documentos onNavigate={setView} />
           )}
 
           {view === 'clientes' && (
