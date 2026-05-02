@@ -10,5 +10,6 @@ namespace LogisticaBroker.DTOs
         public string CodigoBl { get; set; } = string.Empty;
         public string Estado { get; set; } = string.Empty;
         public DateTime FechaCreacion { get; set; }
+        public DateOnly? Eta { get; set; }
     }
 }

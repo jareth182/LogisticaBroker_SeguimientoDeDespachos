@@ -96,7 +96,10 @@ app.UseAuthorization();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DataSeeder.SeedData(context);
+        if (!await context.Despachos.AnyAsync() && !await context.Empresas.AnyAsync())
+    {
+        await DataSeeder.SeedData(context);
+}
 }
 
 app.MapControllers();

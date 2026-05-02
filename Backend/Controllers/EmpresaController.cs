@@ -20,8 +20,32 @@ public class EmpresaController : ControllerBase
     {
         try
         {
-            await _service.RegistrarEmpresaAsync(empresa);
-            return Ok(new { mensaje = "Empresa registrada correctamente 🚀" });
+            var (usuario, password) = await _service.RegistrarEmpresaAsync(empresa);
+            return Ok(new
+            {
+                mensaje           = "Empresa registrada correctamente",
+                nombreContacto    = usuario.NombreCompleto,
+                correo            = usuario.Correo,
+                usuarioGenerado   = $"impac{empresa.Ruc}",
+                passwordTemporal  = password,
+                fechaRegistro     = empresa.FechaRegistro.ToString("dd/MM/yyyy"),
+                ruc               = empresa.Ruc,
+                razonSocial       = empresa.RazonSocial
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Listar()
+    {
+        try
+        {
+            var empresas = await _service.ListarEmpresasAsync();
+            return Ok(empresas);
         }
         catch (Exception ex)
         {
