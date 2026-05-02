@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using LogisticaBroker.Models;
+using LogisticaBroker.DTOs;
 using LogisticaBroker.Services;
 
 namespace LogisticaBroker.Controllers;
@@ -15,45 +15,103 @@ public class DAMController : ControllerBase
         _damService = damService;
     }
 
+    // ─────────────────────────────────────────────────────────
+    // POST /api/DAM/generar-borrador
+    // ─────────────────────────────────────────────────────────
     [HttpPost("generar-borrador")]
-    public async Task<IActionResult> GenerarBorrador([FromBody] DAMRequest request)
+    public async Task<IActionResult> GenerarBorrador([FromBody] CrearDamDto dto)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
         try
         {
-            var result = await _damService.GenerarBorradorAsync(request);
+            var result = await _damService.GenerarBorradorAsync(dto);
             return Ok(result);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return NotFound(new { mensaje = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
         }
     }
 
-    [HttpGet("{id}/borrador")]
-    public async Task<IActionResult> ObtenerBorrador(int id)
+    // ─────────────────────────────────────────────────────────
+    // GET /api/DAM/{idDespacho}/borrador
+    // ─────────────────────────────────────────────────────────
+    [HttpGet("{idDespacho}/borrador")]
+    public async Task<IActionResult> ObtenerBorrador(int idDespacho)
     {
         try
         {
-            var borrador = await _damService.ObtenerBorradorAsync(id);
+            var borrador = await _damService.ObtenerBorradorAsync(idDespacho);
             return Ok(borrador);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
-            return NotFound(new { error = ex.Message });
+            return NotFound(new { mensaje = ex.Message });
         }
     }
 
-    [HttpPost("{id}/finalizar")]
-    public async Task<IActionResult> FinalizarDAM(int id)
+    // ─────────────────────────────────────────────────────────
+    // PUT /api/DAM/{idDespacho}/borrador
+    // ─────────────────────────────────────────────────────────
+    [HttpPut("{idDespacho}/borrador")]
+    public async Task<IActionResult> ActualizarBorrador(int idDespacho, [FromBody] CrearDamDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        try
+        {
+            var result = await _damService.ActualizarBorradorAsync(idDespacho, dto);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { mensaje = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+    }
+    // ─────────────────────────────────────────────────────────
+    // POST /api/DAM/{idDespacho}/finalizar
+    // ─────────────────────────────────────────────────────────
+    [HttpPost("{idDespacho}/finalizar")]
+    public async Task<IActionResult> FinalizarDAM(int idDespacho)
     {
         try
         {
-            var result = await _damService.FinalizarDAMAsync(id);
+            var result = await _damService.FinalizarDAMAsync(idDespacho);
             return Ok(result);
         }
-        catch (Exception ex)
+        catch (KeyNotFoundException ex)
         {
-            return BadRequest(new { error = ex.Message });
+            return NotFound(new { mensaje = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+    }
+
+    // GET /api/DAM/{idDespacho}/etapas
+    [HttpGet("{idDespacho}/etapas")]
+    public async Task<IActionResult> ObtenerEtapas(int idDespacho)
+    {
+        try
+        {
+            var etapas = await _damService.ObtenerEtapasAsync(idDespacho);
+            return Ok(etapas);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { mensaje = ex.Message });
         }
     }
 }

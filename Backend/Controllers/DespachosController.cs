@@ -43,6 +43,27 @@ namespace LogisticaBroker.Controllers
             return Ok(resultado);
         }
 
+        // GET: api/Despachos — listar despachos recientes con datos del importador
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<DespachoListDto>>> ObtenerDespachos()
+        {
+            var despachos = await _despachoRepository.GetAllWithEmpresaAsync();
+
+            var resultado = despachos.Select(d => new DespachoListDto
+            {
+                IdDespacho = d.IdDespacho,
+                IdEmpresa = d.IdEmpresa,
+                Ruc = d.Empresa?.Ruc,
+                RazonSocial = d.Empresa?.RazonSocial,
+                CodigoOrden = d.CodigoOrden,
+                CodigoBl = d.CodigoBl,
+                Estado = d.Estado,
+                FechaCreacion = d.FechaCreacion
+            });
+
+            return Ok(resultado);
+        }
+
         // T31: Desarrollar endpoint POST para registrar la apertura del despacho
         [HttpPost]
         public async Task<IActionResult> CrearDespacho([FromBody] CrearDespachoDto dto)
