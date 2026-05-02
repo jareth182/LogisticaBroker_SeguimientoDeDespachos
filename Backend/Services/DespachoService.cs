@@ -18,9 +18,25 @@ public class DespachoService
         // Generar código de despacho único
         despacho.CodigoOrden = await GenerarCodigoOrdenAsync();
         despacho.FechaCreacion = DateTime.UtcNow;
-        despacho.Estado = "Borrador";
+        despacho.Estado = "En proceso";
+        despacho.PorcentajeProgreso = 0;
 
         _context.Despachos.Add(despacho);
+        await _context.SaveChangesAsync();
+
+        // Crear etapas automáticamente para tracking
+        var tiposEtapa = await _context.TiposEtapa.OrderBy(t => t.Orden).ToListAsync();
+        foreach (var tipo in tiposEtapa)
+        {
+            var etapa = new EtapaDespacho
+            {
+                IdDespacho = despacho.IdDespacho,
+                IdTipoEtapa = tipo.IdTipoEtapa,
+                Estado = tipo.Orden == 1 ? "En Proceso" : "Pendiente",
+                FechaHora = DateTime.UtcNow
+            };
+            _context.EtapasDespacho.Add(etapa);
+        }
         await _context.SaveChangesAsync();
 
         return despacho;

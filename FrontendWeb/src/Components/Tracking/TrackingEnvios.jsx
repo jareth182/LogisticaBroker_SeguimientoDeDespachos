@@ -6,7 +6,7 @@ export default function TrackingEnvios() {
     const [loading, setLoading] = useState(true);
     const [etapas, setEtapas] = useState([]);
 
-    const API_BASE_URL = 'http://localhost:5019/api';
+    const API_BASE_URL = 'http://localhost:5018/api';
 
     useEffect(() => {
         cargarDespachos();
@@ -15,7 +15,7 @@ export default function TrackingEnvios() {
 
     const cargarDespachos = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/despacho/activos`);
+            const response = await fetch(`${API_BASE_URL}/tracking/despacho/activos`);
             if (response.ok) {
                 const data = await response.json();
                 setDespachos(data);
@@ -29,7 +29,7 @@ export default function TrackingEnvios() {
 
     const cargarEtapas = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/etapa/tipos`);
+            const response = await fetch(`${API_BASE_URL}/tracking/etapa/tipos`);
             if (response.ok) {
                 const data = await response.json();
                 setEtapas(data);
@@ -43,7 +43,7 @@ export default function TrackingEnvios() {
         setDespachoSeleccionado(despacho);
         // Cargar etapas específicas del despacho
         try {
-            const response = await fetch(`${API_BASE_URL}/despacho/${despacho.idDespacho}/etapas`);
+            const response = await fetch(`${API_BASE_URL}/tracking/despacho/${despacho.idDespacho}/etapas`);
             if (response.ok) {
                 const etapasDespacho = await response.json();
                 setDespachoSeleccionado(prev => ({ ...prev, etapas: etapasDespacho }));

@@ -8,47 +8,19 @@ public class DataSeeder
 {
     public static async Task SeedData(AppDbContext context)
     {
-        // Verificar si ya hay usuarios
-        if (await context.Usuarios.AnyAsync())
-        {
-            // Verificar si existe el usuario admin
-            var adminUser = await context.Usuarios.FirstOrDefaultAsync(u => u.Correo == "admin@test.com");
-            if (adminUser != null)
-            {
-                Console.WriteLine("=== USUARIOS DE PRUEBA EXISTENTES ===");
-                Console.WriteLine("ADMINISTRADOR:");
-                Console.WriteLine("  Correo: admin@test.com");
-                Console.WriteLine("  Contraseña: admin123");
-                Console.WriteLine("=================================");
-            }
-        }
-        else
-        {
-            // Si no hay usuarios, crearlos
-            await CrearUsuariosYEmpresa(context);
-        }
-
-        // Crear rol de administrador si no existe
+        // 1. Rol de administrador
         if (!await context.Roles.AnyAsync())
         {
-            var rolAdmin = new Rol
-            {
-                IdRol = 1,
-                NombreRol = "Administrador",
-                Descripcion = "Usuario con acceso completo al sistema"
-            };
-            context.Roles.Add(rolAdmin);
+            context.Roles.Add(new Rol { IdRol = 1, NombreRol = "Administrador", Descripcion = "Usuario con acceso completo al sistema" });
+            await context.SaveChangesAsync();
         }
 
-        // Obtener o crear empresa de prueba
-        Empresa empresa;
-        var existingEmpresa = await context.Empresas.FirstOrDefaultAsync(e => e.Correo == "juan@test.com");
-        
-        if (existingEmpresa == null)
+        // 2. Empresa de prueba
+        var empresa = await context.Empresas.FirstOrDefaultAsync(e => e.Correo == "juan@test.com");
+        if (empresa == null)
         {
             empresa = new Empresa
             {
-                IdEmpresa = 1,
                 CodigoOrden = "ORD-001",
                 Ruc = "20123456789",
                 RazonSocial = "Empresa Test SAC",
@@ -62,109 +34,28 @@ public class DataSeeder
                 FechaRegistro = DateOnly.FromDateTime(DateTime.UtcNow)
             };
             context.Empresas.Add(empresa);
-        }
-        else
-        {
-            empresa = existingEmpresa;
+            await context.SaveChangesAsync();
         }
 
-        // Crear usuario de prueba con contraseña conocida
-        var usuarioTest = new Usuario
+        // 3. Usuario admin
+        if (!await context.Usuarios.AnyAsync(u => u.Correo == "admin@test.com"))
         {
-            NombreCompleto = "Administrador del Sistema",
-            Correo = "admin@test.com",
-            ContrasenaHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
-            IdEmpresa = empresa.IdEmpresa,
-            IdRol = 1,
-            Estado = "Activo"
-        };
-
-        context.Usuarios.Add(usuarioTest);
-
-        // Crear usuario para la empresa con contraseña generada
-        var passwordEmpresa = Guid.NewGuid().ToString("N")[..8];
-        var usuarioEmpresa = new Usuario
-        {
-            NombreCompleto = "Juan Perez",
-            Correo = "juan@test.com",
-            ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(passwordEmpresa),
-            IdEmpresa = empresa.IdEmpresa,
-            IdRol = 1,
-            Estado = "Activo"
-        };
-
-        context.Usuarios.Add(usuarioEmpresa);
-        
-        await context.SaveChangesAsync();
-        
-        Console.WriteLine($"Contraseña empresa: {passwordEmpresa}");
-    }
-
-    private static async Task CrearUsuariosYEmpresa(AppDbContext context)
-    {
-        // Crear rol de administrador si no existe
-        if (!await context.Roles.AnyAsync())
-        {
-            var rolAdmin = new Rol
+            context.Usuarios.Add(new Usuario
             {
+                NombreCompleto = "Administrador del Sistema",
+                Correo = "admin@test.com",
+                ContrasenaHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
+                IdEmpresa = empresa.IdEmpresa,
                 IdRol = 1,
-                NombreRol = "Administrador",
-                Descripcion = "Usuario con acceso completo al sistema"
-            };
-            context.Roles.Add(rolAdmin);
+                Estado = "Activo"
+            });
+            await context.SaveChangesAsync();
         }
 
-        // Crear empresa de prueba
-        var empresa = new Empresa
-        {
-            IdEmpresa = 1,
-            CodigoOrden = "ORD-001",
-            Ruc = "20123456789",
-            RazonSocial = "Empresa Test SAC",
-            NombreContacto = "Juan Perez",
-            Correo = "juan@test.com",
-            Celular = "987654321",
-            Direccion = "Av. Test 123",
-            Rubro = "Importación",
-            MontoItem = 1000.00m,
-            Estado = "Pendiente",
-            FechaRegistro = DateOnly.FromDateTime(DateTime.UtcNow)
-        };
-
-        context.Empresas.Add(empresa);
-        await context.SaveChangesAsync();
-
-        // Crear usuario de prueba con contraseña conocida
-        var usuarioTest = new Usuario
-        {
-            NombreCompleto = "Administrador del Sistema",
-            Correo = "admin@test.com",
-            ContrasenaHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
-            IdEmpresa = empresa.IdEmpresa,
-            IdRol = 1,
-            Estado = "Activo"
-        };
-
-        context.Usuarios.Add(usuarioTest);
-
-        // Crear usuario para la empresa con contraseña generada
-        var passwordEmpresa = Guid.NewGuid().ToString("N")[..8];
-        var usuarioEmpresa = new Usuario
-        {
-            NombreCompleto = "Juan Perez",
-            Correo = "juan@test.com",
-            ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(passwordEmpresa),
-            IdEmpresa = empresa.IdEmpresa,
-            IdRol = 1,
-            Estado = "Activo"
-        };
-
-        context.Usuarios.Add(usuarioEmpresa);
-
-        // Crear tipos de etapas para tracking
+        // 4. Tipos de etapas para tracking
         if (!await context.TiposEtapa.AnyAsync())
         {
-            var tiposEtapas = new[]
+            context.TiposEtapa.AddRange(new[]
             {
                 new TipoEtapa { IdTipoEtapa = 1, Nombre = "Documentación Recibida", Descripcion = "Recepción de documentos del cliente", Orden = 1 },
                 new TipoEtapa { IdTipoEtapa = 2, Nombre = "Revisión Documental", Descripcion = "Verificación de documentos", Orden = 2 },
@@ -172,18 +63,17 @@ public class DataSeeder
                 new TipoEtapa { IdTipoEtapa = 4, Nombre = "Aforo Físico", Descripcion = "Inspección de mercancía", Orden = 4 },
                 new TipoEtapa { IdTipoEtapa = 5, Nombre = "Liberación", Descripcion = "Autorización de salida", Orden = 5 },
                 new TipoEtapa { IdTipoEtapa = 6, Nombre = "Entrega Final", Descripcion = "Entrega al cliente", Orden = 6 }
-            };
-            context.TiposEtapa.AddRange(tiposEtapas);
+            });
+            await context.SaveChangesAsync();
         }
 
-        // Crear despachos de prueba para tracking
+        // 5. Despachos de prueba para tracking
         if (!await context.Despachos.AnyAsync())
         {
-            var despachos = new[]
+            context.Despachos.AddRange(new[]
             {
                 new Despacho
                 {
-                    IdDespacho = 1,
                     IdEmpresa = empresa.IdEmpresa,
                     CodigoBl = "BL2024001",
                     CodigoOrden = "ORD-001",
@@ -195,11 +85,10 @@ public class DataSeeder
                     Mercancia = "Electrónicos",
                     PorcentajeProgreso = 60,
                     Estado = "En proceso",
-                    FechaCreacion = DateTime.UtcNow.AddDays(-5)
+                    FechaCreacion = DateTime.UtcNow
                 },
                 new Despacho
                 {
-                    IdDespacho = 2,
                     IdEmpresa = empresa.IdEmpresa,
                     CodigoBl = "BL2024002",
                     CodigoOrden = "ORD-002",
@@ -211,11 +100,10 @@ public class DataSeeder
                     Mercancia = "Textiles",
                     PorcentajeProgreso = 30,
                     Estado = "En proceso",
-                    FechaCreacion = DateTime.UtcNow.AddDays(-3)
+                    FechaCreacion = DateTime.UtcNow
                 },
                 new Despacho
                 {
-                    IdDespacho = 3,
                     IdEmpresa = empresa.IdEmpresa,
                     CodigoBl = "BL2024003",
                     CodigoOrden = "ORD-003",
@@ -227,82 +115,98 @@ public class DataSeeder
                     Mercancia = "Maquinaria",
                     PorcentajeProgreso = 90,
                     Estado = "En proceso",
-                    FechaCreacion = DateTime.UtcNow.AddDays(-7)
+                    FechaCreacion = DateTime.UtcNow
                 }
-            };
-            context.Despachos.AddRange(despachos);
+            });
+            await context.SaveChangesAsync();
         }
 
-        // Crear etapas de despacho para tracking
+        // 6. Etapas de despacho para tracking
         if (!await context.EtapasDespacho.AnyAsync())
         {
-            var etapasDespacho = new List<EtapaDespacho>();
-            
-            // Despacho 1 - 60% completado (3 de 5 etapas)
-            etapasDespacho.AddRange(new[]
+            var despachos = await context.Despachos.OrderBy(d => d.IdDespacho).Take(3).ToListAsync();
+            var tiposEtapa = await context.TiposEtapa.OrderBy(t => t.Orden).ToListAsync();
+
+            if (despachos.Count >= 3 && tiposEtapa.Count >= 6)
             {
-                new EtapaDespacho { IdDespacho = 1, IdTipoEtapa = 1, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-4) },
-                new EtapaDespacho { IdDespacho = 1, IdTipoEtapa = 2, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-3) },
-                new EtapaDespacho { IdDespacho = 1, IdTipoEtapa = 3, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-2) },
-                new EtapaDespacho { IdDespacho = 1, IdTipoEtapa = 4, Estado = "En Proceso", FechaHora = DateTime.UtcNow.AddDays(-1) },
-                new EtapaDespacho { IdDespacho = 1, IdTipoEtapa = 5, Estado = "Pendiente", FechaHora = DateTime.UtcNow },
-                new EtapaDespacho { IdDespacho = 1, IdTipoEtapa = 6, Estado = "Pendiente", FechaHora = DateTime.UtcNow }
-            });
-            
-            // Despacho 2 - 30% completado (1 de 5 etapas)
-            etapasDespacho.AddRange(new[]
-            {
-                new EtapaDespacho { IdDespacho = 2, IdTipoEtapa = 1, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-2) },
-                new EtapaDespacho { IdDespacho = 2, IdTipoEtapa = 2, Estado = "En Proceso", FechaHora = DateTime.UtcNow.AddDays(-1) },
-                new EtapaDespacho { IdDespacho = 2, IdTipoEtapa = 3, Estado = "Pendiente", FechaHora = DateTime.UtcNow },
-                new EtapaDespacho { IdDespacho = 2, IdTipoEtapa = 4, Estado = "Pendiente", FechaHora = DateTime.UtcNow },
-                new EtapaDespacho { IdDespacho = 2, IdTipoEtapa = 5, Estado = "Pendiente", FechaHora = DateTime.UtcNow },
-                new EtapaDespacho { IdDespacho = 2, IdTipoEtapa = 6, Estado = "Pendiente", FechaHora = DateTime.UtcNow }
-            });
-            
-            // Despacho 3 - 90% completado (5 de 6 etapas)
-            etapasDespacho.AddRange(new[]
-            {
-                new EtapaDespacho { IdDespacho = 3, IdTipoEtapa = 1, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-6) },
-                new EtapaDespacho { IdDespacho = 3, IdTipoEtapa = 2, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-5) },
-                new EtapaDespacho { IdDespacho = 3, IdTipoEtapa = 3, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-4) },
-                new EtapaDespacho { IdDespacho = 3, IdTipoEtapa = 4, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-3) },
-                new EtapaDespacho { IdDespacho = 3, IdTipoEtapa = 5, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-2) },
-                new EtapaDespacho { IdDespacho = 3, IdTipoEtapa = 6, Estado = "En Proceso", FechaHora = DateTime.UtcNow.AddDays(-1) }
-            });
-            
-            context.EtapasDespacho.AddRange(etapasDespacho);
+                var etapas = new List<EtapaDespacho>();
+
+                // Despacho 1 - 60% (3 completadas, 1 en proceso, 2 pendientes)
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[0].IdDespacho, IdTipoEtapa = tiposEtapa[0].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-4) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[0].IdDespacho, IdTipoEtapa = tiposEtapa[1].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-3) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[0].IdDespacho, IdTipoEtapa = tiposEtapa[2].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-2) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[0].IdDespacho, IdTipoEtapa = tiposEtapa[3].IdTipoEtapa, Estado = "En Proceso", FechaHora = DateTime.UtcNow.AddDays(-1) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[0].IdDespacho, IdTipoEtapa = tiposEtapa[4].IdTipoEtapa, Estado = "Pendiente", FechaHora = DateTime.UtcNow });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[0].IdDespacho, IdTipoEtapa = tiposEtapa[5].IdTipoEtapa, Estado = "Pendiente", FechaHora = DateTime.UtcNow });
+
+                // Despacho 2 - 30% (1 completada, 1 en proceso, 4 pendientes)
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[1].IdDespacho, IdTipoEtapa = tiposEtapa[0].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-2) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[1].IdDespacho, IdTipoEtapa = tiposEtapa[1].IdTipoEtapa, Estado = "En Proceso", FechaHora = DateTime.UtcNow.AddDays(-1) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[1].IdDespacho, IdTipoEtapa = tiposEtapa[2].IdTipoEtapa, Estado = "Pendiente", FechaHora = DateTime.UtcNow });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[1].IdDespacho, IdTipoEtapa = tiposEtapa[3].IdTipoEtapa, Estado = "Pendiente", FechaHora = DateTime.UtcNow });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[1].IdDespacho, IdTipoEtapa = tiposEtapa[4].IdTipoEtapa, Estado = "Pendiente", FechaHora = DateTime.UtcNow });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[1].IdDespacho, IdTipoEtapa = tiposEtapa[5].IdTipoEtapa, Estado = "Pendiente", FechaHora = DateTime.UtcNow });
+
+                // Despacho 3 - 90% (5 completadas, 1 en proceso)
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[2].IdDespacho, IdTipoEtapa = tiposEtapa[0].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-6) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[2].IdDespacho, IdTipoEtapa = tiposEtapa[1].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-5) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[2].IdDespacho, IdTipoEtapa = tiposEtapa[2].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-4) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[2].IdDespacho, IdTipoEtapa = tiposEtapa[3].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-3) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[2].IdDespacho, IdTipoEtapa = tiposEtapa[4].IdTipoEtapa, Estado = "Completado", FechaHora = DateTime.UtcNow.AddDays(-2) });
+                etapas.Add(new EtapaDespacho { IdDespacho = despachos[2].IdDespacho, IdTipoEtapa = tiposEtapa[5].IdTipoEtapa, Estado = "En Proceso", FechaHora = DateTime.UtcNow.AddDays(-1) });
+
+                context.EtapasDespacho.AddRange(etapas);
+                await context.SaveChangesAsync();
+            }
         }
 
-        // Crear contrato de prueba si no existe
+        // 6b. Asegurar que despachos sin etapas las tengan
+        var despachosSinEtapas = await context.Despachos
+            .Where(d => !context.EtapasDespacho.Any(e => e.IdDespacho == d.IdDespacho))
+            .ToListAsync();
+        if (despachosSinEtapas.Any())
+        {
+            var tiposEtapaAll = await context.TiposEtapa.OrderBy(t => t.Orden).ToListAsync();
+            foreach (var despacho in despachosSinEtapas)
+            {
+                foreach (var tipo in tiposEtapaAll)
+                {
+                    context.EtapasDespacho.Add(new EtapaDespacho
+                    {
+                        IdDespacho = despacho.IdDespacho,
+                        IdTipoEtapa = tipo.IdTipoEtapa,
+                        Estado = tipo.Orden == 1 ? "En Proceso" : "Pendiente",
+                        FechaHora = DateTime.UtcNow
+                    });
+                }
+                // Actualizar estado si era Borrador
+                if (despacho.Estado == "Borrador")
+                {
+                    despacho.Estado = "En proceso";
+                }
+            }
+            await context.SaveChangesAsync();
+        }
+
+        // 7. Contrato de prueba
         if (!await context.ContratosServicio.AnyAsync())
         {
-            var contrato = new ContratoServicio
+            context.ContratosServicio.Add(new ContratoServicio
             {
-                IdContrato = 1,
                 IdEmpresa = empresa.IdEmpresa,
                 Titulo = "Contrato de Servicios Logísticos",
                 Version = "1.0",
                 EstadoFirma = "Pendiente",
-                UrlDocumento = null,
-                TokenFirma = null,
                 EdicionBloqueada = false,
-                FechaGeneracion = DateTime.UtcNow,
-                FechaFirma = null
-            };
-            context.ContratosServicio.Add(contrato);
+                FechaGeneracion = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
         }
-        
-        await context.SaveChangesAsync();
 
-        // Mostrar credenciales en consola para desarrollo
-        Console.WriteLine("=== USUARIOS DE PRUEBA CREADOS ===");
-        Console.WriteLine("ADMINISTRADOR:");
-        Console.WriteLine("  Correo: admin@test.com");
-        Console.WriteLine("  Contraseña: admin123");
-        Console.WriteLine("EMPRESA:");
-        Console.WriteLine("  Correo: juan@test.com");
-        Console.WriteLine($"  Contraseña: {passwordEmpresa}");
-        Console.WriteLine("=================================");
+        // Mostrar credenciales
+        Console.WriteLine("=== CREDENCIALES DE PRUEBA ===");
+        Console.WriteLine("Correo: admin@test.com");
+        Console.WriteLine("Contraseña: admin123");
+        Console.WriteLine("=============================");
     }
 }

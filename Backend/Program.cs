@@ -86,11 +86,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCors("FrontendPolicy");
 app.UseHttpsRedirection();
-
-// Usar CORS
-app.UseCors("AllowFrontend");
+app.UseCors("FrontendPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();

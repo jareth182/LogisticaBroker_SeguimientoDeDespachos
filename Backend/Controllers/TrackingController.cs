@@ -25,7 +25,7 @@ public class TrackingController : ControllerBase
                 .Include(d => d.Empresa)
                 .Include(d => d.Etapas)
                     .ThenInclude(e => e.TipoEtapa)
-                .Where(d => d.Estado == "En proceso")
+                .Where(d => d.Estado != "Finalizado")
                 .OrderByDescending(d => d.FechaCreacion)
                 .Select(d => new {
                     d.IdDespacho,
