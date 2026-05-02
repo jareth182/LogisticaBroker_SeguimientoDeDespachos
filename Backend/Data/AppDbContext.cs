@@ -259,9 +259,15 @@ public class AppDbContext : DbContext
             e.Property(x => x.PesoBrutoKg).HasColumnType("numeric(10,3)");
 
             e.HasOne(x => x.Dam)
-             .WithMany(d => d.Partidas)
-             .HasForeignKey(x => x.IdDam)
-             .OnDelete(DeleteBehavior.Cascade);
+            .WithMany(d => d.Partidas)
+            .HasForeignKey(x => x.IdDam)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired(false);          // ← nullable
+
+            e.HasOne(x => x.Despacho)    // ← nueva relación
+            .WithMany(d => d.Partidas)
+            .HasForeignKey(x => x.IdDespacho)
+            .OnDelete(DeleteBehavior.Restrict);
         });
 
         // ── TIPO_DOCUMENTO ────────────────────────────────────

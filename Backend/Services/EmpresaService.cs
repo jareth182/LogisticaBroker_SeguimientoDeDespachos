@@ -16,7 +16,7 @@ public class EmpresaService
         _emailService = emailService;
     }
 
-    public async Task RegistrarEmpresaAsync(Empresa empresa)
+    public async Task<(Usuario usuario, string passwordTemporal)> RegistrarEmpresaAsync(Empresa empresa)
     {
         if (await _context.Empresas.AnyAsync(e => e.Ruc == empresa.Ruc))
             throw new Exception("El RUC ya está registrado");
@@ -32,44 +32,39 @@ public class EmpresaService
         var usuario = new Usuario
         {
             NombreCompleto = empresa.NombreContacto,
-            Correo = empresa.Correo,
+            Correo         = empresa.Correo,
             ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(password),
-            IdEmpresa = empresa.IdEmpresa,
-            IdRol = 1,
-            Estado = "Activo"
+            IdEmpresa      = empresa.IdEmpresa,
+            IdRol          = 1,
+            Estado         = "Activo"
         };
 
         _context.Usuarios.Add(usuario);
         await _context.SaveChangesAsync();
 
-        var auditoria = new Auditoria
+        _context.Auditorias.Add(new Auditoria
         {
             TablaAfectada = "Empresa",
-            Accion = "INSERT",
-            FechaHora = DateTime.UtcNow,
-            IdUsuario = usuario.IdUsuario
-        };
-
-        _context.Auditorias.Add(auditoria);
+            Accion        = "INSERT",
+            FechaHora     = DateTime.UtcNow,
+            IdUsuario     = usuario.IdUsuario
+        });
         await _context.SaveChangesAsync();
-
-        var html = _emailService.GenerarPlantillaBienvenida(
-            usuario.NombreCompleto,
-            usuario.Correo,
-            password
-        );
 
         try
         {
+            var html = _emailService.GenerarPlantillaBienvenida(
+                usuario.NombreCompleto, usuario.Correo, password);
             await _emailService.EnviarCorreoAsync(
-                usuario.Correo,
-                "Bienvenido a LogisticaBroker 🚀",
-                html
-            );
+                usuario.Correo, "Bienvenido a LogisticaBroker 🚀", html);
         }
-        catch
-        {
-            // no romper flujo si falla correo
-        }
+        catch { }
+
+        return (usuario, password);
     }
+
+    public async Task<List<Empresa>> ListarEmpresasAsync() =>
+    await _context.Empresas
+        .OrderByDescending(e => e.FechaRegistro)
+        .ToListAsync();
 }
