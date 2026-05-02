@@ -58,7 +58,8 @@ namespace LogisticaBroker.Controllers
                 CodigoOrden = d.CodigoOrden,
                 CodigoBl = d.CodigoBl,
                 Estado = d.Estado,
-                FechaCreacion = d.FechaCreacion
+                FechaCreacion = d.FechaCreacion,
+                Eta = d.Eta
             });
 
             return Ok(resultado);
@@ -74,6 +75,8 @@ namespace LogisticaBroker.Controllers
             {
                 return BadRequest(new { mensaje = "Ya existe un despacho activo con este número de Bill of Lading." });
             }
+
+            var empresa = await _empresaRepository.GetByIdAsync(dto.IdEmpresa);
 
             // T33: Autogenerar código secuencial de seguimiento interno
             var ultimoCodigo = await _despachoRepository.ObtenerUltimoCodigoOrdenAsync();
@@ -94,6 +97,8 @@ namespace LogisticaBroker.Controllers
                 IdEmpresa = dto.IdEmpresa,
                 CodigoBl = dto.CodigoBl,
                 CodigoOrden = nuevoCodigo,
+                Eta = dto.Eta,
+                Mercancia = dto.Mercancia,
                 Estado = "En Apertura", // Sobrescribe el valor por defecto "En proceso" del modelo
                 FechaCreacion = DateTime.UtcNow
             };
@@ -107,8 +112,30 @@ namespace LogisticaBroker.Controllers
             { 
                 mensaje = "Expediente aperturado exitosamente", 
                 codigoOrden = nuevoDespacho.CodigoOrden,
-                estado = nuevoDespacho.Estado
+                estado = nuevoDespacho.Estado,
+                codigoBl = nuevoDespacho.CodigoBl,
+                fechaCreacion = nuevoDespacho.FechaCreacion,
+                eta = nuevoDespacho.Eta,
+                razonSocial = empresa?.RazonSocial,
+                ruc = empresa?.Ruc
             });
+        }
+
+        // DELETE: api/Despachos/{id}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> EliminarDespacho(int id)
+        {
+            var despacho = await _despachoRepository.GetByIdAsync(id);
+            if (despacho == null)
+                return NotFound(new { mensaje = "Despacho no encontrado." });
+
+            if (despacho.Estado == "Liquidación Terminada")
+                return BadRequest(new { mensaje = "No se puede eliminar un despacho con DAM finalizada." });
+
+            _despachoRepository.Delete(despacho);
+            await _unitOfWork.SaveChangesAsync();
+
+            return Ok(new { mensaje = $"Despacho {despacho.CodigoOrden} eliminado correctamente." });
         }
     }
 }

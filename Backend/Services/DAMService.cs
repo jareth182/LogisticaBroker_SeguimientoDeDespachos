@@ -64,7 +64,7 @@ public class DAMService
     // ─────────────────────────────────────────────────────────
     public async Task<DamResponseDto> ObtenerBorradorAsync(int idDespacho)
     {
-        var dam = await _uow.Dams.GetDamConPartidasAsync(idDespacho)
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho)
             ?? throw new KeyNotFoundException(
                 "No se encontró una DAM para este despacho");
 

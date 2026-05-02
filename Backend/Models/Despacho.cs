@@ -26,4 +26,5 @@ public class Despacho
     public ICollection<DiligenciaAforo> Diligencias { get; set; } = [];
     public ICollection<ComprobantePago> Comprobantes { get; set; } = [];
     public ICollection<DespachoRestriccion> Restricciones { get; set; } = [];
+    public ICollection<PartidaArancelaria> Partidas { get; set; } = [];
 }
