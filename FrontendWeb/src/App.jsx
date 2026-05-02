@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import Login from './Components/Auth/Login';
 import CrearDespacho from './Components/Despachos/CrearDespacho';
 import ListaDespachos from './Components/Despachos/ListaDespachos';
+import DetalleDespacho from './Components/Despachos/DetalleDespacho';
 
 export default function App() {
   const [usuario, setUsuario] = useState(null);
   const [view, setView] = useState('crear');
+  const [despachoActivo, setDespachoActivo] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebarCollapsed') === 'true'; } catch { return false; }
   });
@@ -68,6 +70,11 @@ export default function App() {
     .join('')
     .toUpperCase() || 'U';
 
+  const handleVerDetalle = (despacho) => {
+    setDespachoActivo(despacho);
+    setView('detalle');
+  };
+
   return (
     <div className="flex h-screen bg-[#f8fafc] font-sans overflow-hidden">
       {/* ================= SIDEBAR (MENÚ LATERAL) ================= */}
@@ -87,14 +94,9 @@ export default function App() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 space-y-1">
-          <NavItem icon="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" text="Dashboard" onClick={() => setView('dashboard')} collapsed={isCollapsed} active={view === 'dashboard'} />
           <NavItem icon="M12 4v16m8-8H4" text="Crear Despacho" onClick={() => setView('crear')} collapsed={isCollapsed} active={view === 'crear'} />
-          <NavItem icon="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" text="Repositorio de Despacho" onClick={() => setView('lista')} collapsed={isCollapsed} active={view === 'lista'} />
-          <NavItem icon="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" text="Tracking de Envíos" onClick={() => setView('tracking')} collapsed={isCollapsed} active={view === 'tracking'} />
+          <NavItem icon="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" text="Repositorio de Despacho" onClick={() => setView('lista')} collapsed={isCollapsed} active={view === 'lista' || view === 'detalle'} />
           <NavItem icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" text="Panel de Trazabilidad" onClick={() => setView('trazabilidad')} collapsed={isCollapsed} active={view === 'trazabilidad'} />
-          <NavItem icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" text="Generar Borrador DAM" onClick={() => setView('dam')} collapsed={isCollapsed} active={view === 'dam'} />
-          <NavItem icon="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" text="Firma de Documentos" onClick={() => setView('firma')} collapsed={isCollapsed} active={view === 'firma'} />
-          <NavItem icon="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" text="Clientes" onClick={() => setView('clientes')} collapsed={isCollapsed} active={view === 'clientes'} />
           <NavItem icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" text="Configuración" collapsed={isCollapsed} />
         </nav>
 
@@ -156,24 +158,17 @@ export default function App() {
           )}
 
           {view === 'lista' && (
-            <ListaDespachos refreshKey={refreshKey} />
+              <ListaDespachos
+                  refreshKey={refreshKey}
+                  onVerDetalle={handleVerDetalle}
+              />
           )}
 
-          {view === 'tracking' && (
-            <div>
-              <h1 className="text-2xl font-bold text-[#0f172a] mb-6">Tracking de Envíos</h1>
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8">{/* Pantalla en blanco por ahora */}</div>
-            </div>
-          )}
-
-          {view === 'dam' && (
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8">{/* Borrador DAM: pantalla en blanco (placeholder) */}</div>
-          )}
-
-          {view === 'dashboard' && (
-            <div>
-              <CrearDespacho onCreated={handleCreated} />
-            </div>
+          {view === 'detalle' && despachoActivo && (
+              <DetalleDespacho
+                  despacho={despachoActivo}
+                  onVolver={() => setView('lista')}
+              />
           )}
         </div>
 

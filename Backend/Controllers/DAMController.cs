@@ -57,6 +57,29 @@ public class DAMController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────────
+    // PUT /api/DAM/{idDespacho}/borrador
+    // ─────────────────────────────────────────────────────────
+    [HttpPut("{idDespacho}/borrador")]
+    public async Task<IActionResult> ActualizarBorrador(int idDespacho, [FromBody] CrearDamDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        try
+        {
+            var result = await _damService.ActualizarBorradorAsync(idDespacho, dto);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { mensaje = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+    }
+    // ─────────────────────────────────────────────────────────
     // POST /api/DAM/{idDespacho}/finalizar
     // ─────────────────────────────────────────────────────────
     [HttpPost("{idDespacho}/finalizar")]
@@ -74,6 +97,21 @@ public class DAMController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { mensaje = ex.Message });
+        }
+    }
+
+    // GET /api/DAM/{idDespacho}/etapas
+    [HttpGet("{idDespacho}/etapas")]
+    public async Task<IActionResult> ObtenerEtapas(int idDespacho)
+    {
+        try
+        {
+            var etapas = await _damService.ObtenerEtapasAsync(idDespacho);
+            return Ok(etapas);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { mensaje = ex.Message });
         }
     }
 }

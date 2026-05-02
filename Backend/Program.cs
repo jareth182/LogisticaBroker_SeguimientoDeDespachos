@@ -45,10 +45,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Conexión a PostgreSQL
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 // Repository Pattern — registrar aquí
 builder.Services.AddScoped<IDespachoRepository, DespachoRepository>();
 builder.Services.AddScoped<IEmpresaRepository, EmpresaRepository>();

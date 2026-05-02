@@ -1,16 +1,20 @@
+using LogisticaBroker.Data;
 using LogisticaBroker.DTOs;
 using LogisticaBroker.Models;
 using LogisticaBroker.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace LogisticaBroker.Services;
 
 public class DAMService
 {
     private readonly IUnitOfWork _uow;
+    private readonly AppDbContext _context;
 
-    public DAMService(IUnitOfWork uow)
+    public DAMService(IUnitOfWork uow, AppDbContext context)
     {
         _uow = uow;
+        _context = context;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -77,16 +81,78 @@ public class DAMService
                 "No se encontró una DAM para este despacho");
 
         if (dam.EdicionBloqueada)
-            throw new InvalidOperationException(
-                "La DAM ya está finalizada");
+            throw new InvalidOperationException("La DAM ya está finalizada");
 
+        // 1. Bloquear la DAM
         dam.EdicionBloqueada  = true;
         dam.Estado            = "Finalizado";
         dam.FechaFinalizacion = DateTime.UtcNow;
 
+        // 2. Actualizar estado del despacho → "Liquidación Terminada" (CA4)
+        var despacho = await _uow.Despachos.GetByIdAsync(idDespacho)
+            ?? throw new KeyNotFoundException("Despacho no encontrado");
+
+        despacho.Estado = "Liquidación Terminada";
+
+        // 3. Registrar etapa en EtapasDespacho (IdTipoEtapa 4 = Generación DAM)
+        var usuario = await _context.Usuarios
+            .FirstOrDefaultAsync(u => u.IdUsuario == dam.IdUsuarioCreador);
+
+        var etapaExistente = await _context.EtapasDespacho
+            .FirstOrDefaultAsync(e => e.IdDespacho == idDespacho && e.IdTipoEtapa == 4);
+
+        if (etapaExistente is null)
+        {
+            _context.EtapasDespacho.Add(new EtapaDespacho
+            {
+                IdDespacho           = idDespacho,
+                IdTipoEtapa          = 4,
+                IdUsuarioResponsable = dam.IdUsuarioCreador,
+                Estado               = "Finalizado",
+                Descripcion          = "DAM generada y bloqueada oficialmente",
+                FechaHora            = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            etapaExistente.Estado    = "Finalizado";
+            etapaExistente.FechaHora = DateTime.UtcNow;
+        }
+
         await _uow.SaveChangesAsync();
 
         return MapToResponseDto(dam);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // GET /api/DAM/{idDespacho}/etapas
+    // ─────────────────────────────────────────────────────────
+    public async Task<List<EtapaDespachoDto>> ObtenerEtapasAsync(int idDespacho)
+    {
+        _ = await _uow.Despachos.GetByIdAsync(idDespacho)
+            ?? throw new KeyNotFoundException("Despacho no encontrado");
+
+        var tiposEtapa = await _context.TiposEtapa
+            .OrderBy(t => t.Orden)
+            .ToListAsync();
+
+        var etapasRegistradas = await _context.EtapasDespacho
+            .Where(e => e.IdDespacho == idDespacho)
+            .ToListAsync();
+
+        return tiposEtapa.Select(tipo =>
+        {
+            var etapa = etapasRegistradas
+                .FirstOrDefault(e => e.IdTipoEtapa == tipo.IdTipoEtapa);
+            return new EtapaDespachoDto
+            {
+                IdTipoEtapa = tipo.IdTipoEtapa,
+                Nombre      = tipo.Nombre,
+                Orden       = tipo.Orden,
+                Estado      = etapa?.Estado ?? "Pendiente",
+                FechaHora   = etapa?.FechaHora
+            };
+        }).ToList();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -113,5 +179,30 @@ public class DAMService
             EdicionBloqueada       = d.EdicionBloqueada,
             FechaCreacion          = d.FechaCreacion,
             FechaFinalizacion      = d.FechaFinalizacion
-        };
+    };
+
+    public async Task<DamResponseDto> ActualizarBorradorAsync(int idDespacho, CrearDamDto dto)
+    {
+        var dam = await _uow.Dams.GetByDespachoAsync(idDespacho)
+            ?? throw new KeyNotFoundException("No se encontró una DAM para este despacho");
+
+        if (dam.EdicionBloqueada)
+            throw new InvalidOperationException("La DAM está finalizada y no puede editarse");
+
+        dam.ImportadorExportador   = dto.ImportadorExportador;
+        dam.CodDocIdentificacion   = dto.CodDocIdentificacion;
+        dam.DireccionImportador    = dto.DireccionImportador;
+        dam.EmpresaTransporte      = dto.EmpresaTransporte;
+        dam.ViaTransporte          = dto.ViaTransporte ?? "Marítimo";
+        dam.PuertoEmbarque         = dto.PuertoEmbarque;
+        dam.TerminalAlmacenamiento = dto.TerminalAlmacenamiento;
+        dam.ValorFob               = dto.ValorFob;
+        dam.Flete                  = dto.Flete;
+        dam.Seguro                 = dto.Seguro;
+        dam.TotalAjustes           = dto.TotalAjustes;
+
+        await _uow.SaveChangesAsync();
+
+        return MapToResponseDto(dam);
+    }
 }
