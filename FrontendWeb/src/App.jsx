@@ -3,6 +3,7 @@ import Login from './Components/Auth/Login';
 import CrearDespacho from './Components/Despachos/CrearDespacho';
 import ListaDespachos from './Components/Despachos/ListaDespachos';
 import DetalleDespacho from './Components/Despachos/DetalleDespacho';
+import RegistrarEmpresa from './Components/Empresa/RegistrarEmpresa';
 
 export default function App() {
   const [usuario, setUsuario] = useState(null);
@@ -169,6 +170,13 @@ export default function App() {
                   despacho={despachoActivo}
                   onVolver={() => setView('lista')}
               />
+          )}
+
+          {view === 'clientes' && (
+            <RegistrarEmpresa onSuccess={(msg) => {
+              setToast({ show: true, title: 'Éxito', message: msg || 'Empresa registrada', type: 'success' });
+              setTimeout(() => setToast(t => ({ ...t, show: false })), 5000);
+            }} />
           )}
         </div>
 
