@@ -18,7 +18,7 @@ public class ContratoController : ControllerBase
     }
 
     [HttpPost("crear")]
-    public async Task<IActionResult> CrearContrato([FromBody] Contrato contrato)
+    public async Task<IActionResult> CrearContrato([FromBody] ContratoServicio contrato)
     {
         try
         {
@@ -59,7 +59,24 @@ public class ContratoController : ControllerBase
         try
         {
             var contrato = await _contratoService.ObtenerContratoAsync(id);
-            return Ok(contrato);
+            
+            // Mapear a DTO compatible con frontend
+            var contratoDto = new {
+                id = contrato.IdContrato,
+                empresaId = contrato.IdEmpresa,
+                numeroContrato = $"CTR-{contrato.IdContrato}",
+                tipoContrato = "Servicios Logísticos",
+                titulo = contrato.Titulo,
+                descripcion = "Contrato para servicios de importación y despacho aduanero",
+                fechaCreacion = contrato.FechaGeneracion,
+                fechaFirma = contrato.FechaFirma,
+                estado = contrato.EstadoFirma,
+                contenido = "Contenido del contrato...",
+                firmaDigital = contrato.TokenFirma,
+                urlDocumento = contrato.UrlDocumento
+            };
+            
+            return Ok(contratoDto);
         }
         catch (Exception ex)
         {

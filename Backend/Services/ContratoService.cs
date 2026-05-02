@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using LogisticaBroker.Data;
 using LogisticaBroker.Models;
 
@@ -12,15 +13,13 @@ public class ContratoService
         _context = context;
     }
 
-    public async Task<Contrato> CrearContratoAsync(Contrato contrato)
+    public async Task<ContratoServicio> CrearContratoAsync(ContratoServicio contrato)
     {
-        contrato.FechaCreacion = DateTime.UtcNow;
-        contrato.NumeroContrato = await GenerarNumeroContratoAsync();
-        contrato.Estado = "Borrador";
+        contrato.FechaGeneracion = DateTime.UtcNow;
+        contrato.EstadoFirma = "Borrador";
 
-        // TODO: Guardar en base de datos
-        // _context.Contratos.Add(contrato);
-        // await _context.SaveChangesAsync();
+        _context.ContratosServicio.Add(contrato);
+        await _context.SaveChangesAsync();
 
         return contrato;
     }
@@ -30,74 +29,50 @@ public class ContratoService
         var contrato = await ObtenerContratoAsync(id);
         
         // Validar que el contrato esté en estado de poder firmarse
-        if (contrato.Estado != "PendienteFirma")
+        if (contrato.EstadoFirma != "Pendiente")
         {
-            throw new InvalidOperationException($"El contrato no puede ser firmado en estado: {contrato.Estado}");
+            throw new InvalidOperationException($"El contrato no puede ser firmado en estado: {contrato.EstadoFirma}");
         }
 
         // Generar firma digital
         var firmaDigital = await GenerarFirmaDigitalAsync(request);
 
-        // Actualizar contrato
+        // Actualizar contrato en base de datos
         contrato.FechaFirma = DateTime.UtcNow;
-        contrato.Estado = "Firmado";
-        contrato.FirmaDigital = firmaDigital;
+        contrato.EstadoFirma = "Firmado";
+        contrato.TokenFirma = firmaDigital;
+        contrato.UrlDocumento = await GenerarPDFContratoAsync(contrato);
 
-        // Agregar firma a la lista
-        contrato.Firmas.Add(new Firma
-        {
-            ContratoId = id,
-            NombreFirmante = request.NombreFirmante,
-            EmailFirmante = request.EmailFirmante,
-            CargoFirmante = request.CargoFirmante,
-            FirmaDigital = request.FirmaDigital,
-            FechaFirma = DateTime.UtcNow,
-            IpAddress = request.IpAddress,
-            EsValida = true
-        });
-
-        // Generar PDF firmado (simulado)
-        var contratoFirmado = await GenerarPDFContratoAsync(contrato);
+        // Guardar cambios en base de datos
+        _context.ContratosServicio.Update(contrato);
+        await _context.SaveChangesAsync();
 
         // Actualizar estado de la empresa a "Afiliado Activo"
-        await ActualizarEstadoEmpresaAsync(contrato.EmpresaId);
-
-        // TODO: Guardar cambios en base de datos
-        // await _context.SaveChangesAsync();
+        await ActualizarEstadoEmpresaAsync(contrato.IdEmpresa);
 
         return new FirmaResponse
         {
             ContratoId = id,
             Mensaje = "Contrato firmado correctamente",
-            ContratoFirmado = contratoFirmado,
+            ContratoFirmado = contrato.UrlDocumento,
             FirmaDigital = firmaDigital,
-            FechaFirma = DateTime.UtcNow
+            FechaFirma = DateTime.UtcNow,
+            UrlAlmacenamiento = contrato.UrlDocumento
         };
     }
 
-    public async Task<Contrato> ObtenerContratoAsync(int id)
+    public async Task<ContratoServicio> ObtenerContratoAsync(int id)
     {
-        // TODO: Implementar búsqueda real en base de datos
-        await Task.CompletedTask;
-        
-        if (id == 0)
+        var contrato = await _context.ContratosServicio
+            .Include(c => c.Empresa)
+            .FirstOrDefaultAsync(c => c.IdContrato == id);
+
+        if (contrato == null)
         {
             throw new KeyNotFoundException($"Contrato con ID {id} no encontrado");
         }
 
-        return new Contrato
-        {
-            Id = id,
-            EmpresaId = 1,
-            NumeroContrato = $"CTR-{id}",
-            TipoContrato = "Servicios Logísticos",
-            Titulo = "Contrato de Servicios de Importación",
-            Descripcion = "Contrato para servicios de importación y despacho aduanero",
-            FechaCreacion = DateTime.UtcNow.AddDays(-30),
-            Estado = "PendienteFirma",
-            Contenido = "Contenido del contrato...",
-            Firmas = new List<Firma>()
-        };
+        return contrato;
     }
 
     private async Task<string> GenerarNumeroContratoAsync()
@@ -115,7 +90,7 @@ public class ContratoService
         return $"firma_digital_{Guid.NewGuid()}";
     }
 
-    private async Task<string> GenerarPDFContratoAsync(Contrato contrato)
+    private async Task<string> GenerarPDFContratoAsync(ContratoServicio contrato)
     {
         // TODO: Implementar generación real de PDF
         await Task.CompletedTask;
@@ -124,16 +99,11 @@ public class ContratoService
 
     private async Task ActualizarEstadoEmpresaAsync(int empresaId)
     {
-        // TODO: Implementar actualización real del estado de la empresa
-        await Task.CompletedTask;
-        
-        // Simulación: Cambiar estado a "Afiliado Activo"
-        // En la implementación real:
-        // var empresa = await _context.Empresas.FindAsync(empresaId);
-        // if (empresa != null)
-        // {
-        //     empresa.Estado = "Afiliado Activo";
-        //     await _context.SaveChangesAsync();
-        // }
+        var empresa = await _context.Empresas.FindAsync(empresaId);
+        if (empresa != null)
+        {
+            empresa.Estado = "Afiliado Activo";
+            await _context.SaveChangesAsync();
+        }
     }
 }
