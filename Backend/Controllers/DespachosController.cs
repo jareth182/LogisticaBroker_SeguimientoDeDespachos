@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using LogisticaBroker.DTOs;
 using LogisticaBroker.Models;
 using LogisticaBroker.Repositories.Interfaces;
-
+using LogisticaBroker.Data;
 namespace LogisticaBroker.Controllers
 {
     [Route("api/[controller]")]
@@ -12,16 +12,18 @@ namespace LogisticaBroker.Controllers
         private readonly IDespachoRepository _despachoRepository;
         private readonly IEmpresaRepository _empresaRepository;
         private readonly IUnitOfWork _unitOfWork;
-
+        private readonly AppDbContext _context;
         // Inyección de dependencias
         public DespachosController(
             IDespachoRepository despachoRepository, 
             IEmpresaRepository empresaRepository,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            AppDbContext context)  
         {
             _despachoRepository = despachoRepository;
             _empresaRepository = empresaRepository;
             _unitOfWork = unitOfWork;
+            _context  = context;
         }
 
         // T30: Desarrollar endpoint GET para listar clientes afiliados activos
@@ -106,18 +108,26 @@ namespace LogisticaBroker.Controllers
             // Guarda la entidad en la base de datos usando el patrón repositorio y unidad de trabajo
             await _despachoRepository.AddAsync(nuevoDespacho);
             await _unitOfWork.SaveChangesAsync(); 
+            _context.EtapasDespacho.Add(new EtapaDespacho
+            {
+                IdDespacho  = nuevoDespacho.IdDespacho,
+                IdTipoEtapa = 1,
+                Estado      = "Finalizado",
+                Descripcion = "Despacho creado correctamente",
+                FechaHora   = DateTime.UtcNow
+            });
+            await _unitOfWork.SaveChangesAsync();
 
-            // Retorna confirmación estructurada
-            return Ok(new 
-            { 
-                mensaje = "Expediente aperturado exitosamente", 
-                codigoOrden = nuevoDespacho.CodigoOrden,
-                estado = nuevoDespacho.Estado,
-                codigoBl = nuevoDespacho.CodigoBl,
+            return Ok(new
+            {
+                mensaje      = "Expediente aperturado exitosamente",
+                codigoOrden  = nuevoDespacho.CodigoOrden,
+                estado       = nuevoDespacho.Estado,
+                codigoBl     = nuevoDespacho.CodigoBl,
                 fechaCreacion = nuevoDespacho.FechaCreacion,
-                eta = nuevoDespacho.Eta,
-                razonSocial = empresa?.RazonSocial,
-                ruc = empresa?.Ruc
+                eta          = nuevoDespacho.Eta,
+                razonSocial  = empresa?.RazonSocial,
+                ruc          = empresa?.Ruc
             });
         }
 
