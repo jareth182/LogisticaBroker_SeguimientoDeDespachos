@@ -337,7 +337,7 @@ export default function ListaDespachos({ onNuevoDespacho, onVerLiquidaciones, on
                 <button onClick={onNuevoDespacho}
                     className="flex items-center gap-2 px-4 py-2.5 bg-[#008b9c] text-white text-sm font-semibold rounded-xl hover:bg-[#007685] transition-colors shadow-sm">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                    Nuevo Despacho
+                    Crear Despacho
                 </button>
             </div>
 
@@ -469,7 +469,7 @@ export default function ListaDespachos({ onNuevoDespacho, onVerLiquidaciones, on
                                 <th className="px-5 py-4">Importador</th>
                                 <th className="px-5 py-4">BL</th>
                                 <th className="px-5 py-4">Estado</th>
-                                <th className="px-5 py-4">ETA</th>
+                                <th className="px-5 py-4">Fecha Estimada de Arribo</th>
                                 <th className="px-5 py-4">Creación</th>
                                 <th className="px-5 py-4 text-center">Opciones</th>
                             </tr>
