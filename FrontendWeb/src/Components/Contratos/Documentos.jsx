@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
-export default function Documentos() {
+export default function Documentos({ onNavigate }) {
     const [documentos, setDocumentos] = useState([]);
     const [loading, setLoading] = useState(false);
     const [mensaje, setMensaje] = useState(null);
     const [filtro, setFiltro] = useState('todos');
+    const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
 
     const API_BASE_URL = 'http://localhost:5018/api';
 
@@ -15,43 +16,27 @@ export default function Documentos() {
     const cargarDocumentos = async () => {
         setLoading(true);
         try {
-            // Simular carga de documentos
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            const documentosSimulados = [
-                {
-                    id: 1,
-                    nombre: 'Contrato de Servicios Logísticos',
-                    tipo: 'Contrato',
-                    estado: 'Firmado',
-                    fechaCreacion: '2024-01-15',
-                    fechaFirma: '2024-01-20',
-                    urlDescarga: '/api/contrato/1/documento',
-                    tieneSelloDigital: true
-                },
-                {
-                    id: 2,
-                    nombre: 'DAM - Declaración Aduanera',
-                    tipo: 'DAM',
-                    estado: 'Finalizado',
-                    fechaCreacion: '2024-01-18',
-                    fechaFirma: null,
-                    urlDescarga: '/api/dam/1/documento',
-                    tieneSelloDigital: false
-                },
-                {
-                    id: 3,
-                    nombre: 'Autorización de Despacho',
-                    tipo: 'Autorización',
-                    estado: 'Pendiente',
-                    fechaCreacion: '2024-01-22',
-                    fechaFirma: null,
-                    urlDescarga: '/api/despacho/1/documento',
-                    tieneSelloDigital: false
-                }
-            ];
+            // Obtener idEmpresa del usuario logueado
+            const userData = localStorage.getItem('user');
+            const idEmpresa = userData ? JSON.parse(userData).idEmpresa : 1;
 
-            setDocumentos(documentosSimulados);
+            const response = await fetch(`${API_BASE_URL}/contrato/empresa/${idEmpresa}`);
+            if (response.ok) {
+                const contratos = await response.json();
+                const documentosMapeados = contratos.map(c => ({
+                    id: c.id,
+                    nombre: c.titulo || `Contrato #${c.id}`,
+                    tipo: c.tipo || 'Contrato',
+                    estado: c.estado === 'Firmado' ? 'Firmado' : c.estado === 'Pendiente' ? 'Pendiente' : c.estado,
+                    fechaCreacion: c.fechaCreacion,
+                    fechaFirma: c.fechaFirma,
+                    urlDescarga: `/api/contrato/${c.id}/documento`,
+                    tieneSelloDigital: c.tieneSelloDigital || false
+                }));
+                setDocumentos(documentosMapeados);
+            } else {
+                setDocumentos([]);
+            }
         } catch (error) {
             setMensaje({
                 tipo: 'error',
@@ -277,7 +262,7 @@ export default function Documentos() {
 
                                                 {documento.estado === 'Pendiente' && documento.tipo === 'Contrato' && (
                                                     <button
-                                                        onClick={() => window.location.href = '/firma-contrato'}
+                                                        onClick={() => onNavigate?.('firma-contrato')}
                                                         className="px-4 py-2 bg-[#00b4d8] text-white text-sm font-medium rounded-lg hover:bg-[#009bc2] transition-colors flex items-center space-x-2"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -288,7 +273,7 @@ export default function Documentos() {
                                                 )}
 
                                                 <button
-                                                    onClick={() => window.location.href = `/documento/${documento.id}`}
+                                                    onClick={() => setDocumentoSeleccionado(documento)}
                                                     className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -305,6 +290,104 @@ export default function Documentos() {
                         </div>
                     )}
                 </div>
+
+                {/* Panel de vista previa del documento */}
+                {documentoSeleccionado && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="p-6">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-bold text-gray-800">{documentoSeleccionado.nombre}</h3>
+                                    <button
+                                        onClick={() => setDocumentoSeleccionado(null)}
+                                        className="text-gray-400 hover:text-gray-600"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-sm text-gray-500">Tipo</span>
+                                            <p className="font-medium text-gray-800">{documentoSeleccionado.tipo}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-gray-500">Estado</span>
+                                            <p className="font-medium">
+                                                <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getEstadoColor(documentoSeleccionado.estado)}`}>
+                                                    {documentoSeleccionado.estado}
+                                                </span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-gray-500">Fecha de Creación</span>
+                                            <p className="font-medium text-gray-800">{new Date(documentoSeleccionado.fechaCreacion).toLocaleDateString('es-PE')}</p>
+                                        </div>
+                                        {documentoSeleccionado.fechaFirma && (
+                                            <div>
+                                                <span className="text-sm text-gray-500">Fecha de Firma</span>
+                                                <p className="font-medium text-gray-800">{new Date(documentoSeleccionado.fechaFirma).toLocaleDateString('es-PE')}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {documentoSeleccionado.tieneSelloDigital && (
+                                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                            <div className="flex items-center space-x-2 text-green-700">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                                </svg>
+                                                <span className="font-medium text-sm">Documento con Sello Digital Válido</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                                        <svg className="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        <p className="text-gray-500 text-sm">Vista previa del documento</p>
+                                        <p className="text-gray-400 text-xs mt-1">{documentoSeleccionado.nombre}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                                    {documentoSeleccionado.estado === 'Firmado' && documentoSeleccionado.tieneSelloDigital && (
+                                        <button
+                                            onClick={() => handleDescargar(documentoSeleccionado)}
+                                            className="px-4 py-2 bg-[#00b4d8] text-white text-sm font-medium rounded-lg hover:bg-[#009bc2] transition-colors flex items-center space-x-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            <span>Descargar PDF</span>
+                                        </button>
+                                    )}
+                                    {documentoSeleccionado.estado === 'Pendiente' && documentoSeleccionado.tipo === 'Contrato' && (
+                                        <button
+                                            onClick={() => { setDocumentoSeleccionado(null); onNavigate?.('firma-contrato'); }}
+                                            className="px-4 py-2 bg-[#00b4d8] text-white text-sm font-medium rounded-lg hover:bg-[#009bc2] transition-colors flex items-center space-x-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                            <span>Firmar Documento</span>
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setDocumentoSeleccionado(null)}
+                                        className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
