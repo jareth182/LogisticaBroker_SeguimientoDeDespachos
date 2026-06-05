@@ -45,23 +45,27 @@ namespace LogisticaBroker.Controllers
             return Ok(resultado);
         }
 
-        // GET: api/Despachos — listar despachos recientes con datos del importador
+        // GET: api/Despachos — listar despachos recientes (filtro opcional por empresa para rol Cliente)
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<DespachoListDto>>> ObtenerDespachos()
+        public async Task<ActionResult<IEnumerable<DespachoListDto>>> ObtenerDespachos([FromQuery] int? idEmpresa = null)
         {
             var despachos = await _despachoRepository.GetAllWithEmpresaAsync();
 
+            if (idEmpresa.HasValue)
+                despachos = despachos.Where(d => d.IdEmpresa == idEmpresa.Value);
+
             var resultado = despachos.Select(d => new DespachoListDto
             {
-                IdDespacho = d.IdDespacho,
-                IdEmpresa = d.IdEmpresa,
-                Ruc = d.Empresa?.Ruc,
-                RazonSocial = d.Empresa?.RazonSocial,
-                CodigoOrden = d.CodigoOrden,
-                CodigoBl = d.CodigoBl,
-                Estado = d.Estado,
+                IdDespacho    = d.IdDespacho,
+                IdEmpresa     = d.IdEmpresa,
+                Ruc           = d.Empresa?.Ruc,
+                RazonSocial   = d.Empresa?.RazonSocial,
+                CodigoOrden   = d.CodigoOrden,
+                CodigoBl      = d.CodigoBl,
+                Estado        = d.Estado,
                 FechaCreacion = d.FechaCreacion,
-                Eta = d.Eta
+                Eta           = d.Eta,
+                NombreCanal   = d.Canal?.NombreCanal
             });
 
             return Ok(resultado);

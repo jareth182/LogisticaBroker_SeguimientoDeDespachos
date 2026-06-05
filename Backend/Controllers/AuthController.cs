@@ -36,6 +36,26 @@ public class AuthController : ControllerBase
     }
 
     // ─────────────────────────────────────────────────────────
+    // POST /api/Auth/recuperar-contrasena — HU Recuperar contraseña
+    // ─────────────────────────────────────────────────────────
+    [HttpPost("recuperar-contrasena")]
+    public async Task<IActionResult> RecuperarContrasena([FromBody] RecuperarContrasenaDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        try
+        {
+            await _authService.RecuperarContrasenaAsync(dto);
+            return Ok(new { mensaje = "Si el correo está registrado, recibirás las instrucciones de recuperación." });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { mensaje = "No se pudo enviar el correo. Intenta nuevamente." });
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
     // POST /api/Auth/logout
     // El logout real se maneja en el frontend eliminando el token
     // ─────────────────────────────────────────────────────────

@@ -25,4 +25,13 @@ public class UsuarioInfoDto
     public string NombreCompleto { get; set; } = null!;
     public string Correo { get; set; } = null!;
     public string Rol { get; set; } = null!;
+    public int? IdEmpresa { get; set; }
+    public string? EstadoEmpresa { get; set; }
+}
+
+public class RecuperarContrasenaDto
+{
+    [Required(ErrorMessage = "El correo es obligatorio")]
+    [EmailAddress(ErrorMessage = "Formato de correo inválido")]
+    public string Correo { get; set; } = null!;
 }

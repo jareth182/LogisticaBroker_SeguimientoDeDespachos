@@ -8,10 +8,15 @@ public class DataSeeder
 {
     public static async Task SeedData(AppDbContext context)
     {
-        // 1. Rol de administrador
-        if (!await context.Roles.AnyAsync())
+        // 1. Roles
+        if (!await context.Roles.AnyAsync(r => r.IdRol == 1))
         {
             context.Roles.Add(new Rol { IdRol = 1, NombreRol = "Administrador", Descripcion = "Usuario con acceso completo al sistema" });
+            await context.SaveChangesAsync();
+        }
+        if (!await context.Roles.AnyAsync(r => r.IdRol == 2))
+        {
+            context.Roles.Add(new Rol { IdRol = 2, NombreRol = "Cliente", Descripcion = "Empresa importadora con acceso al portal de trazabilidad" });
             await context.SaveChangesAsync();
         }
 
@@ -52,6 +57,17 @@ public class DataSeeder
             await context.SaveChangesAsync();
         }
 
+        // 3.5 Canales SUNAT
+        if (!await context.CanalesSunat.AnyAsync())
+        {
+            context.CanalesSunat.AddRange(
+                new CanalSunat { IdCanal = 1, NombreCanal = "Canal Verde",   Descripcion = "Liberación automática",       ColorHex = "#22c55e" },
+                new CanalSunat { IdCanal = 2, NombreCanal = "Canal Naranja", Descripcion = "Revisión documentaria",       ColorHex = "#f97316" },
+                new CanalSunat { IdCanal = 3, NombreCanal = "Canal Rojo",    Descripcion = "Inspección física requerida", ColorHex = "#ef4444" }
+            );
+            await context.SaveChangesAsync();
+        }
+
         // 4. Tipos de etapas para tracking
         if (!await context.TiposEtapa.AnyAsync())
         {
@@ -84,6 +100,7 @@ public class DataSeeder
                     Eta = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(15)),
                     Mercancia = "Electrónicos",
                     PorcentajeProgreso = 60,
+                    IdCanal = 1,
                     Estado = "En proceso",
                     FechaCreacion = DateTime.UtcNow
                 },
@@ -99,6 +116,7 @@ public class DataSeeder
                     Eta = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20)),
                     Mercancia = "Textiles",
                     PorcentajeProgreso = 30,
+                    IdCanal = 2,
                     Estado = "En proceso",
                     FechaCreacion = DateTime.UtcNow
                 },
@@ -114,6 +132,7 @@ public class DataSeeder
                     Eta = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10)),
                     Mercancia = "Maquinaria",
                     PorcentajeProgreso = 90,
+                    IdCanal = 3,
                     Estado = "En proceso",
                     FechaCreacion = DateTime.UtcNow
                 }
@@ -160,6 +179,13 @@ public class DataSeeder
             }
         }
 
+        // 6a. Asignar canal a despachos que aún no tienen (datos preexistentes)
+        var sinCanal = await context.Despachos.Where(d => d.IdCanal == null).OrderBy(d => d.IdDespacho).ToListAsync();
+        int[] rotacion = { 1, 2, 3 };
+        for (int i = 0; i < sinCanal.Count; i++)
+            sinCanal[i].IdCanal = rotacion[i % rotacion.Length];
+        if (sinCanal.Any()) await context.SaveChangesAsync();
+
         // 6b. Asegurar que despachos sin etapas las tengan
         var despachosSinEtapas = await context.Despachos
             .Where(d => !context.EtapasDespacho.Any(e => e.IdDespacho == d.IdDespacho))
@@ -203,10 +229,57 @@ public class DataSeeder
             await context.SaveChangesAsync();
         }
 
+        // Usuario cliente de prueba
+        var empresaCliente = await context.Empresas.FirstOrDefaultAsync(e => e.Correo == "cliente@importaciones.com");
+        if (empresaCliente == null)
+        {
+            empresaCliente = new Empresa
+            {
+                Ruc           = "20567891234",
+                RazonSocial   = "Importaciones Andinas SAC",
+                NombreContacto= "María González",
+                Correo        = "cliente@importaciones.com",
+                Celular        = "998877665",
+                Estado        = "Pendiente",
+                FechaRegistro = DateOnly.FromDateTime(DateTime.UtcNow)
+            };
+            context.Empresas.Add(empresaCliente);
+            await context.SaveChangesAsync();
+        }
+
+        if (!await context.Usuarios.AnyAsync(u => u.Correo == "cliente@test.com"))
+        {
+            context.Usuarios.Add(new Usuario
+            {
+                NombreCompleto = "María González",
+                Correo         = "cliente@test.com",
+                ContrasenaHash = BCrypt.Net.BCrypt.HashPassword("cliente123"),
+                IdEmpresa      = empresaCliente.IdEmpresa,
+                IdRol          = 2,
+                Estado         = "Activo"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // Contrato pendiente para empresa cliente
+        if (!await context.ContratosServicio.AnyAsync(c => c.IdEmpresa == empresaCliente.IdEmpresa))
+        {
+            context.ContratosServicio.Add(new ContratoServicio
+            {
+                IdEmpresa        = empresaCliente.IdEmpresa,
+                Titulo           = "Contrato de Prestación de Servicios Aduaneros",
+                Version          = "1.0",
+                EstadoFirma      = "Pendiente",
+                EdicionBloqueada = false,
+                FechaGeneracion  = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+        }
+
         // Mostrar credenciales
         Console.WriteLine("=== CREDENCIALES DE PRUEBA ===");
-        Console.WriteLine("Correo: admin@test.com");
-        Console.WriteLine("Contraseña: admin123");
-        Console.WriteLine("=============================");
+        Console.WriteLine("Admin  → admin@test.com   / admin123");
+        Console.WriteLine("Cliente→ cliente@test.com / cliente123");
+        Console.WriteLine("==============================");
     }
 }

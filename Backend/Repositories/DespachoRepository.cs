@@ -41,6 +41,7 @@ public class DespachoRepository : Repository<Despacho>, IDespachoRepository
     public async Task<IEnumerable<Despacho>> GetAllWithEmpresaAsync() =>
         await _context.Despachos
             .Include(d => d.Empresa)
+            .Include(d => d.Canal)
             .OrderByDescending(d => d.FechaCreacion)
             .ToListAsync();
 }

@@ -1,376 +1,360 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-const API_DESPACHOS = 'http://localhost:5018/api/Despachos';
+const API = 'http://localhost:5018/api/Despachos';
 
-function StepIndicator({ paso }) {
-    const pasos = [
-        { id: 1, label: 'Datos generales',  sub: 'Ingresa la información'    },
-        { id: 2, label: 'Confirmación',      sub: 'Revisa y edita los datos'  },
-        { id: 3, label: 'Resultado',         sub: 'Despacho creado'           },
-    ];
+/* ── Selector de cliente con búsqueda ────────────────────── */
+function ClienteSelector({ value, onChange, error }) {
+    const [query, setQuery]         = useState('');
+    const [opciones, setOpciones]   = useState([]);
+    const [abierto, setAbierto]     = useState(false);
+    const [loading, setLoading]     = useState(false);
+    const ref = useRef(null);
+
+    /* Cerrar al hacer clic fuera */
+    useEffect(() => {
+        const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setAbierto(false); };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
+    }, []);
+
+    /* Buscar clientes con debounce */
+    useEffect(() => {
+        if (query.length < 1) { setOpciones([]); return; }
+        const t = setTimeout(async () => {
+            setLoading(true);
+            try {
+                const res = await fetch(`${API}/clientes/buscar?termino=${encodeURIComponent(query)}`);
+                if (res.ok) { setOpciones(await res.json()); setAbierto(true); }
+            } catch { /* sin conexión */ }
+            finally { setLoading(false); }
+        }, 250);
+        return () => clearTimeout(t);
+    }, [query]);
+
+    const seleccionar = (c) => {
+        onChange(c);
+        setQuery(`${c.razonSocial} (${c.ruc})`);
+        setOpciones([]);
+        setAbierto(false);
+    };
+
+    const limpiar = () => {
+        onChange(null);
+        setQuery('');
+        setOpciones([]);
+    };
+
     return (
-        <div className="flex items-center gap-0 mb-8">
-            {pasos.map((p, i) => {
-                const activo   = paso === p.id;
-                const completo = paso > p.id;
-                return (
-                    <div key={p.id} className="flex items-center">
-                        <div className="flex items-center gap-2.5">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-all duration-300 ${
-                                completo ? 'bg-[#008b9c] text-white' :
-                                activo   ? 'bg-[#008b9c] text-white ring-4 ring-[#e0f7fa]' :
-                                           'bg-gray-100 text-gray-400 border-2 border-gray-200'
-                            }`}>
-                                {completo ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg> : p.id}
+        <div ref={ref} className="relative">
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                Cliente
+            </label>
+            <div className={`flex items-center border rounded-lg bg-white transition-all ${
+                error ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-300 focus-within:border-[#1a2540] focus-within:ring-2 focus-within:ring-blue-100'
+            }`}>
+                <input
+                    type="text"
+                    value={value ? `${value.razonSocial} (${value.ruc})` : query}
+                    onChange={e => { if (value) limpiar(); else setQuery(e.target.value); }}
+                    onFocus={() => { if (opciones.length > 0) setAbierto(true); }}
+                    placeholder="Buscar cliente por RUC o Razón Social..."
+                    readOnly={!!value}
+                    className="flex-1 px-4 py-2.5 text-sm bg-transparent outline-none text-gray-700 placeholder-gray-400 cursor-pointer"
+                />
+                {value ? (
+                    <button type="button" onClick={limpiar} className="px-3 text-gray-400 hover:text-gray-600">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                ) : loading ? (
+                    <svg className="w-4 h-4 mr-3 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                ) : (
+                    <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                )}
+            </div>
+            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+
+            {/* Dropdown de sugerencias */}
+            {abierto && opciones.length > 0 && (
+                <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                    {opciones.map(c => (
+                        <li key={c.idEmpresa}
+                            onClick={() => seleccionar(c)}
+                            className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 last:border-0 transition-colors">
+                            <div className="w-8 h-8 rounded-full bg-[#1a2540] flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                {c.razonSocial?.[0]?.toUpperCase() || '?'}
                             </div>
                             <div>
-                                <p className={`text-xs font-bold leading-tight ${activo || completo ? 'text-[#008b9c]' : 'text-gray-400'}`}>{p.label}</p>
-                                <p className="text-[10px] text-gray-400">{p.sub}</p>
+                                <p className="text-sm font-semibold text-gray-800">{c.razonSocial}</p>
+                                <p className="text-xs text-gray-400 font-mono">{c.ruc}</p>
                             </div>
-                        </div>
-                        {i < pasos.length - 1 && (
-                            <div className={`w-16 h-0.5 mx-4 transition-all duration-500 ${completo ? 'bg-[#008b9c]' : 'bg-gray-200'}`} />
-                        )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {abierto && opciones.length === 0 && query.length >= 1 && !loading && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3 text-sm text-gray-400">
+                    No se encontraron clientes activos para "{query}"
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ── Pantalla de éxito ────────────────────────────────────── */
+function PantallaExito({ despacho, onNuevo, onVolver }) {
+    return (
+        <div className="max-w-xl mx-auto">
+            <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
+                <button onClick={onVolver} className="hover:text-[#1a2540] transition-colors">Operatividad</button>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                <span className="text-gray-600 font-medium">Nuevo Despacho</span>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                {/* Banda verde de éxito */}
+                <div className="h-1.5 bg-gradient-to-r from-green-400 to-emerald-400" />
+
+                <div className="p-8 text-center">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                        </svg>
                     </div>
-                );
-            })}
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">¡Despacho creado exitosamente!</h2>
+                    <p className="text-sm text-gray-500 mb-6">El expediente ha sido registrado y está listo para operaciones.</p>
+
+                    {/* Código de seguimiento destacado */}
+                    <div className="inline-flex items-center gap-3 bg-[#1a2540] text-white px-6 py-3 rounded-xl mb-6">
+                        <svg className="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        <div className="text-left">
+                            <p className="text-xs text-blue-300 uppercase tracking-wider">Código de seguimiento</p>
+                            <p className="text-xl font-bold tracking-widest">{despacho.codigoOrden}</p>
+                        </div>
+                    </div>
+
+                    {/* Datos del despacho */}
+                    <div className="bg-gray-50 rounded-xl divide-y divide-gray-100 text-left mb-6">
+                        {[
+                            { label: 'Cliente',        value: despacho.razonSocial },
+                            { label: 'RUC',            value: despacho.ruc, mono: true },
+                            { label: 'Bill of Lading', value: despacho.codigoBl, mono: true },
+                            { label: 'Estado inicial', value: despacho.estado || 'En Apertura', badge: true },
+                        ].map(f => (
+                            <div key={f.label} className="flex items-center justify-between px-5 py-3 text-sm">
+                                <span className="text-gray-400">{f.label}</span>
+                                {f.badge ? (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                                        {f.value}
+                                    </span>
+                                ) : (
+                                    <span className={`font-semibold text-gray-800 ${f.mono ? 'font-mono' : ''}`}>{f.value || '—'}</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex gap-3">
+                        <button onClick={onNuevo}
+                            className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Crear otro
+                        </button>
+                        <button onClick={onVolver}
+                            className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#243050] transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                            </svg>
+                            Ver historial
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
 
-function EstadoBadge({ estado }) {
-    return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-            {estado || 'En Apertura'}
-        </span>
-    );
-}
-
-function CampoEditable({ label, value, onChange, placeholder, mono = false, type = 'text' }) {
-    return (
-        <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">{label}</label>
-            <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-                className={`w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#008b9c] focus:ring-2 focus:ring-[#e0f7fa] bg-white transition-all ${mono ? 'font-mono' : ''}`} />
-        </div>
-    );
-}
-
+/* ── Componente principal ─────────────────────────────────── */
 export default function DespachoOperativo({ onVerDetalle, onVolver }) {
-    const [paso, setPaso] = useState(1);
+    const [cliente, setCliente]   = useState(null);
+    const [bl, setBl]             = useState('');
+    const [errores, setErrores]   = useState({});
+    const [loading, setLoading]   = useState(false);
+    const [errorApi, setErrorApi] = useState(null);
+    const [creado, setCreado]     = useState(null);
 
-    const [busqueda, setBusqueda]             = useState('');
-    const [clientes, setClientes]             = useState([]);
-    const [clienteSeleccionado, setClienteSel] = useState(null);
-    const [codigoBl, setCodigoBl]             = useState('');
-    const [eta, setEta]                       = useState('');
-    const [observaciones, setObservaciones]   = useState('');
-    const [errores, setErrores]               = useState({});
+    const normalizeBl = (v) => v.toUpperCase().replace(/\s+/g, '');
 
-    const [confRazonSocial, setConfRazonSocial] = useState('');
-    const [confRuc, setConfRuc]                 = useState('');
-    const [confBl, setConfBl]                   = useState('');
-    const [confEta, setConfEta]                 = useState('');
-    const [confObs, setConfObs]                 = useState('');
-
-    const [despachoCreado, setDespachoCreado] = useState(null);
-    const [loading, setLoading]               = useState(false);
-    const [errorApi, setErrorApi]             = useState(null);
-    const [toastVisible, setToastVisible]     = useState(false);
-
-    useEffect(() => {
-        if (busqueda.length < 1) { setClientes([]); return; }
-        const timer = setTimeout(async () => {
-            try {
-                const res = await fetch(`${API_DESPACHOS}/clientes/buscar?termino=${encodeURIComponent(busqueda)}`);
-                if (res.ok) setClientes(await res.json());
-            } catch (e) { console.error(e); }
-        }, 250);
-        return () => clearTimeout(timer);
-    }, [busqueda]);
-
-    const seleccionarCliente = (c) => {
-        setClienteSel(c);
-        setBusqueda(`${c.razonSocial} (${c.ruc})`);
-        setClientes([]);
-        setErrores(e => ({ ...e, cliente: undefined }));
-    };
-
-    const normalizeBl = (bl) => (bl || '').toUpperCase().replace(/\s+/g, '');
-    const isValidBl = (bl) => /^[A-Z]{4}\d{7}$/.test(normalizeBl(bl));
-    const blProgress = (bl) => {
-        const normalized = normalizeBl(bl);
-        const letters = (normalized.match(/[A-Z]/g) || []).length;
-        const digits = (normalized.match(/\d/g) || []).length;
-        return { letters, digits, normalized };
-    };
-
-    const handleSiguiente = () => {
+    const handleCrear = async () => {
         const e = {};
-        if (!clienteSeleccionado)      e.cliente = 'Selecciona un cliente de la lista';
-        if (!codigoBl)                 e.bl = 'El BL es obligatorio';
-        else if (!isValidBl(codigoBl)) {
-            const { letters, digits } = blProgress(codigoBl);
-            e.bl = `Formato inválido. Debe ser 4 letras + 7 dígitos (ej. MSCU1234567). Letras ${letters}/4, dígitos ${digits}/7.`;
-        }
+        if (!cliente)   e.cliente = 'Selecciona un cliente de la lista.';
+        if (!bl.trim()) e.bl = 'El número de BL es obligatorio.';
         setErrores(e);
         if (Object.keys(e).length > 0) return;
-        setConfRazonSocial(clienteSeleccionado.razonSocial);
-        setConfRuc(clienteSeleccionado.ruc);
-        setConfBl(codigoBl.trim().toUpperCase());
-        setConfEta(eta);
-        setConfObs(observaciones);
-        setPaso(2);
-    };
 
-    const handleConfirmar = async () => {
         setLoading(true);
         setErrorApi(null);
         try {
-            const res = await fetch(API_DESPACHOS, {
+            const res = await fetch(API, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idEmpresa: clienteSeleccionado.idEmpresa, codigoBl: confBl.trim().toUpperCase(), eta: confEta || null, mercancia: confObs || null })
+                body: JSON.stringify({
+                    idEmpresa: cliente.idEmpresa,
+                    codigoBl:  normalizeBl(bl),
+                }),
             });
             const data = await res.json();
             if (res.ok) {
-                setDespachoCreado(data); setPaso(3);
-                setToastVisible(true); setTimeout(() => setToastVisible(false), 5000);
-            } else { setErrorApi(data.mensaje || 'Error al crear el despacho.'); }
-        } catch { setErrorApi('No se pudo conectar con el servidor.'); }
-        finally { setLoading(false); }
+                setCreado(data);
+            } else {
+                setErrorApi(data.mensaje || 'Error al crear el despacho. Verifica que el BL no esté duplicado.');
+            }
+        } catch {
+            setErrorApi('No se pudo conectar con el servidor. Verifica que el backend esté activo.');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleLimpiar = () => {
-        setBusqueda(''); setClientes([]); setClienteSel(null);
-        setCodigoBl(''); setEta(''); setObservaciones('');
-        setErrores({}); setErrorApi(null); setDespachoCreado(null); setPaso(1);
+    const resetear = () => {
+        setCliente(null); setBl(''); setErrores({}); setErrorApi(null); setCreado(null);
     };
 
-    const formatFecha = (f) => {
-        if (!f) return '—';
-        try { return new Date(f).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
-        catch { return f; }
-    };
+    if (creado) {
+        return <PantallaExito despacho={creado} onNuevo={resetear} onVolver={onVolver} />;
+    }
 
     return (
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-xl mx-auto">
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
-                <button onClick={onVolver} className="hover:text-[#008b9c] transition-colors">Despachos</button>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                <span className="text-[#008b9c] font-semibold">Nuevo Despacho</span>
+                <button onClick={onVolver} className="hover:text-[#1a2540] transition-colors">Operatividad</button>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="text-gray-600 font-medium">Nuevo Despacho</span>
             </div>
 
-            {/* Header */}
-            <div className="flex items-start justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Nuevo Despacho de Importación</h1>
-                    <p className="text-sm text-gray-500 mt-1">Registra un nuevo expediente para iniciar el proceso operativo.</p>
+            {/* Título */}
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">Crear Despacho Importación</h1>
+
+            {/* Formulario */}
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-4">
+                {/* Header de sección */}
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+                    <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                    </div>
+                    <h2 className="text-base font-bold text-gray-800">Información General</h2>
                 </div>
-                <button onClick={onVolver} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                    Volver
-                </button>
-            </div>
 
-            <StepIndicator paso={paso} />
+                <div className="p-6 space-y-5">
+                    {/* Cliente */}
+                    <ClienteSelector
+                        value={cliente}
+                        onChange={(c) => { setCliente(c); setErrores(e => ({ ...e, cliente: undefined })); }}
+                        error={errores.cliente}
+                    />
 
-            {/* ── PASO 1 ── */}
-            {paso === 1 && (
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-[#008b9c] text-white flex items-center justify-center text-sm font-bold ring-4 ring-[#e0f7fa]">1</div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-800">Datos del nuevo despacho</p>
-                            <p className="text-xs text-gray-400">Completa la información para crear el expediente.</p>
+                    {/* BL */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                            Número de BL (Bill of Lading)
+                        </label>
+                        <div className={`flex items-center border rounded-lg bg-white transition-all ${
+                            errores.bl ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-300 focus-within:border-[#1a2540] focus-within:ring-2 focus-within:ring-blue-100'
+                        }`}>
+                            <input
+                                type="text"
+                                value={bl}
+                                onChange={e => { setBl(normalizeBl(e.target.value)); setErrores(er => ({ ...er, bl: undefined })); setErrorApi(null); }}
+                                placeholder="Ej. HLCU1234567"
+                                className="flex-1 px-4 py-2.5 text-sm font-mono bg-transparent outline-none text-gray-700 placeholder-gray-400"
+                            />
+                            <span className="px-3 text-gray-400 font-bold text-lg select-none">#</span>
                         </div>
-                    </div>
-                    <div className="p-6 space-y-5">
-                        {/* Cliente */}
-                        <div className="relative">
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Cliente <span className="text-red-500">*</span></label>
-                            <input type="text" value={busqueda} onChange={e => { setBusqueda(e.target.value); setClienteSel(null); }}
-                                placeholder="Buscar por RUC o Razón Social..."
-                                className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${errores.cliente ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-[#008b9c] focus:ring-2 focus:ring-[#e0f7fa]'}`} />
-                            {clienteSeleccionado && <p className="text-xs text-[#008b9c] mt-1 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>Cliente seleccionado correctamente</p>}
-                            {errores.cliente && <p className="text-xs text-red-500 mt-1">{errores.cliente}</p>}
-                            {clientes.length > 0 && (
-                                <ul className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                                    {clientes.map(c => (
-                                        <li key={c.idEmpresa} onClick={() => seleccionarCliente(c)} className="px-4 py-3 hover:bg-[#e0f7fa] cursor-pointer border-b border-gray-50 last:border-0">
-                                            <p className="text-sm font-semibold text-gray-800">{c.razonSocial}</p>
-                                            <p className="text-xs text-gray-400">{c.ruc}</p>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                        {/* BL */}
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Bill of Lading (BL) <span className="text-red-500">*</span></label>
-                            <div className="relative">
-                                <input type="text" value={codigoBl} onChange={e => { setCodigoBl(normalizeBl(e.target.value)); setErrores(er => ({ ...er, bl: undefined })); }}
-                                    placeholder="Ej. COSU6384765890"
-                                    className={`w-full px-4 py-2.5 border rounded-lg text-sm font-mono outline-none transition-all ${errores.bl ? 'border-red-300 bg-red-50' : codigoBl && isValidBl(codigoBl) ? 'border-green-300 bg-green-50' : 'border-gray-300 focus:border-[#008b9c] focus:ring-2 focus:ring-[#e0f7fa]'}`} />
-                                {codigoBl && isValidBl(codigoBl) && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg></span>}
-                            </div>
-                            {errores.bl ? (
-                                <p className="text-xs text-red-500 mt-1">{errores.bl}</p>
-                            ) : codigoBl && !isValidBl(codigoBl) ? (
-                                <p className="text-xs text-amber-600 mt-1">
-                                    Progreso: letras {blProgress(codigoBl).letters}/4, dígitos {blProgress(codigoBl).digits}/7.
-                                </p>
-                            ) : (
-                                <p className="text-xs text-gray-400 mt-1">Ingresa el número de BL exactamente como figura en el documento.</p>
-                            )}
-                        </div>
-                        {/* ETA */}
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Fecha estimada de arribo</label>
-                            <input type="date" value={eta} onChange={e => setEta(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-[#008b9c] focus:ring-2 focus:ring-[#e0f7fa] text-gray-600" />
-                        </div>
-                        {/* Observaciones */}
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Observaciones (opcional)</label>
-                            <textarea rows="3" value={observaciones} onChange={e => setObservaciones(e.target.value)} placeholder="Observaciones adicionales del despacho..." className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:border-[#008b9c] resize-none" />
-                        </div>
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={handleLimpiar} className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                Limpiar
-                            </button>
-                            <button onClick={handleSiguiente} className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-[#008b9c] text-white text-sm font-semibold rounded-lg hover:bg-[#007685] transition-colors shadow-sm">
-                                Siguiente
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ── PASO 2 ── */}
-            {paso === 2 && (
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-[#008b9c] text-white flex items-center justify-center text-sm font-bold ring-4 ring-[#e0f7fa]">2</div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-800">Confirmación de creación</p>
-                            <p className="text-xs text-gray-400">Revisa y edita los datos antes de confirmar.</p>
-                        </div>
-                    </div>
-                    <div className="p-6 space-y-5">
-                        <div className="p-3 bg-[#f0fdfa] border border-[#99f6e4] rounded-xl flex items-center gap-3">
-                            <svg className="w-5 h-5 text-[#008b9c] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <p className="text-sm text-[#0f766e]">Puedes editar cualquier campo antes de confirmar la creación del expediente.</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <CampoEditable label="Razón Social" value={confRazonSocial} onChange={setConfRazonSocial} placeholder="Razón social" />
-                            <CampoEditable label="RUC" value={confRuc} onChange={setConfRuc} placeholder="RUC" mono />
-                        </div>
-                        <CampoEditable label="Bill of Lading (BL)" value={confBl} onChange={setConfBl} placeholder="XXXX0000000" mono />
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha estimada de arribo</label>
-                                <input type="date" value={confEta} onChange={e => setConfEta(e.target.value)} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#008b9c] focus:ring-2 focus:ring-[#e0f7fa] text-gray-600" />
-                            </div>
-                            <CampoEditable label="Observaciones" value={confObs} onChange={setConfObs} placeholder="Opcional" />
-                        </div>
-                        {errorApi && (
-                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                {errorApi}
-                            </div>
+                        {errores.bl ? (
+                            <p className="text-xs text-red-500 mt-1.5">{errores.bl}</p>
+                        ) : (
+                            <p className="text-xs text-gray-400 mt-1.5">
+                                Ingrese el número de conocimiento de embarque principal o hijo.
+                            </p>
                         )}
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={() => { setPaso(1); setErrorApi(null); }} className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                                Volver
-                            </button>
-                            <button onClick={handleConfirmar} disabled={loading}
-                                className={`flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-[#008b9c] text-white text-sm font-semibold rounded-lg hover:bg-[#007685] transition-colors shadow-sm ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}>
-                                {loading ? <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Creando...</> : <>Confirmar y Crear Despacho <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg></>}
-                            </button>
-                        </div>
                     </div>
-                </div>
-            )}
 
-            {/* ── PASO 3 ── */}
-            {paso === 3 && despachoCreado && (
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-[#008b9c] text-white flex items-center justify-center text-sm font-bold ring-4 ring-[#e0f7fa]">3</div>
-                        <div>
-                            <p className="text-sm font-bold text-gray-800">Resultado</p>
-                            <p className="text-xs text-gray-400">El expediente ha sido creado correctamente.</p>
+                    {/* Error API */}
+                    {errorApi && (
+                        <div className="flex items-start gap-2.5 p-3.5 bg-red-50 border border-red-200 rounded-lg">
+                            <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-sm text-red-700">{errorApi}</p>
                         </div>
-                    </div>
-                    <div className="p-6 space-y-5">
-                        <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3">
-                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center shrink-0">
-                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-green-800">¡Despacho creado exitosamente!</p>
-                                <p className="text-xs text-green-600 mt-0.5">El sistema ha generado el expediente y lo ha registrado con éxito.</p>
-                            </div>
-                        </div>
-                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs text-gray-400">Código de seguimiento</span>
-                                <span className="text-xl font-bold text-[#008b9c]">{despachoCreado.codigoOrden}</span>
-                            </div>
-                            {[
-                                { label: 'Cliente',        value: despachoCreado.razonSocial || confRazonSocial },
-                                { label: 'RUC',            value: despachoCreado.ruc || confRuc, mono: true },
-                                { label: 'Bill of Lading', value: despachoCreado.codigoBl,       mono: true },
-                                { label: 'Fecha creación', value: formatFecha(despachoCreado.fechaCreacion) },
-                            ].map(f => (
-                                <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0 text-sm">
-                                    <span className="text-gray-400">{f.label}</span>
-                                    <span className={`font-semibold text-gray-800 ${f.mono ? 'font-mono' : ''}`}>{f.value}</span>
-                                </div>
-                            ))}
-                            <div className="flex justify-between items-center pt-1 text-sm">
-                                <span className="text-gray-400">Estado inicial</span>
-                                <EstadoBadge estado={despachoCreado.estado || 'En Apertura'} />
-                            </div>
-                        </div>
-                        <div className="flex items-start gap-2.5 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                            <svg className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <p className="text-xs text-blue-700">El expediente se encuentra en estado "En Apertura". Puedes continuar cargando la documentación desde el detalle.</p>
-                        </div>
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={handleLimpiar} className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-                                Nuevo despacho
-                            </button>
-                            <button onClick={onVolver} className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-[#008b9c] text-white text-sm font-semibold rounded-lg hover:bg-[#007685] transition-colors shadow-sm">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-                                Ver lista de despachos
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                    )}
 
-            {/* Toast */}
-            {toastVisible && despachoCreado && (
-                <div className="fixed bottom-6 right-6 bg-white border border-green-100 rounded-xl shadow-xl p-4 flex items-start gap-4 z-50 min-w-[340px]">
-                    <div className="bg-green-100 p-1.5 rounded-full text-green-600">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                    {/* Botones */}
+                    <div className="flex items-center justify-end gap-3 pt-1">
+                        <button
+                            type="button"
+                            onClick={onVolver}
+                            disabled={loading}
+                            className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCrear}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#243050] transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            {loading ? (
+                                <>
+                                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                    </svg>
+                                    Creando…
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                    </svg>
+                                    Crear Despacho
+                                </>
+                            )}
+                        </button>
                     </div>
-                    <div className="flex-1">
-                        <h4 className="text-sm font-bold text-gray-900">Despacho registrado correctamente</h4>
-                        <p className="text-xs text-gray-500 mt-0.5">El expediente {despachoCreado.codigoOrden} ha sido creado en estado "En Apertura".</p>
-                    </div>
-                    <button onClick={() => setToastVisible(false)} className="text-gray-400 hover:text-gray-600">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
                 </div>
-            )}
+            </div>
+
+            {/* Consideraciones operativas */}
+            <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm">
+                <svg className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                    <p className="font-semibold text-blue-800 mb-0.5">Consideraciones operativas</p>
+                    <p className="text-blue-700 leading-relaxed">
+                        Asegúrese de contar con la copia del BL escaneada. El sistema validará automáticamente el formato del número de BL contra los manifiestos de aduana disponibles.
+                    </p>
+                </div>
+            </div>
         </div>
     );
 }

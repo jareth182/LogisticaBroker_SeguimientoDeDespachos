@@ -12,11 +12,13 @@ public class AuthService
 {
     private readonly AppDbContext _context;
     private readonly IConfiguration _config;
+    private readonly EmailService _emailService;
 
-    public AuthService(AppDbContext context, IConfiguration config)
+    public AuthService(AppDbContext context, IConfiguration config, EmailService emailService)
     {
-        _context = context;
-        _config = config;
+        _context      = context;
+        _config       = config;
+        _emailService = emailService;
     }
 
     // ─────────────────────────────────────────────────────────
@@ -24,9 +26,10 @@ public class AuthService
     // ─────────────────────────────────────────────────────────
     public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
     {
-        // 1. Buscar usuario por correo incluyendo su rol
+        // 1. Buscar usuario por correo incluyendo su rol y empresa
         var usuario = await _context.Usuarios
             .Include(u => u.Rol)
+            .Include(u => u.Empresa)
             .FirstOrDefaultAsync(u => u.Correo == dto.Correo);
 
         // 2. Verificar que existe y que la contraseña es correcta
@@ -46,12 +49,32 @@ public class AuthService
             Expiracion = DateTime.UtcNow.AddHours(8),
             Usuario = new UsuarioInfoDto
             {
-                IdUsuario     = usuario.IdUsuario,
+                IdUsuario      = usuario.IdUsuario,
                 NombreCompleto = usuario.NombreCompleto,
-                Correo        = usuario.Correo,
-                Rol           = usuario.Rol.NombreRol
+                Correo         = usuario.Correo,
+                Rol            = usuario.Rol.NombreRol,
+                IdEmpresa      = usuario.IdEmpresa,
+                EstadoEmpresa  = usuario.Empresa?.Estado
             }
         };
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // HU — Recuperar contraseña
+    // ─────────────────────────────────────────────────────────
+    public async Task RecuperarContrasenaAsync(RecuperarContrasenaDto dto)
+    {
+        var usuario = await _context.Usuarios
+            .FirstOrDefaultAsync(u => u.Correo == dto.Correo);
+
+        // Siempre respondemos igual para no revelar si el correo existe
+        if (usuario is null) return;
+
+        var token   = Guid.NewGuid().ToString("N")[..12].ToUpper();
+        var asunto  = "Recuperación de contraseña — Logística Broker";
+        var html    = _emailService.GenerarPlantillaRecuperacion(usuario.NombreCompleto, usuario.Correo, token);
+
+        await _emailService.EnviarCorreoAsync(usuario.Correo, asunto, html);
     }
 
     // ─────────────────────────────────────────────────────────
