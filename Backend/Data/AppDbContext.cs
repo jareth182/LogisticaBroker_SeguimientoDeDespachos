@@ -27,6 +27,8 @@ public class AppDbContext : DbContext
     public DbSet<NotificacionEmail> NotificacionesEmail { get; set; }
     public DbSet<ComprobantePago> ComprobantesPago { get; set; }
     public DbSet<Auditoria> Auditorias { get; set; }
+    public DbSet<DocumentoLogistico> DocumentosLogisticos { get; set; }
+    public DbSet<ItemFactura> ItemsFactura { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -341,6 +343,40 @@ public class AppDbContext : DbContext
              .WithMany()
              .HasForeignKey(x => x.IdUsuarioValidador)
              .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ── DOCUMENTO_LOGISTICO ───────────────────────────────────
+        modelBuilder.Entity<DocumentoLogistico>(e => {
+            e.HasKey(x => x.IdDocumentoLogistico);
+            e.Property(x => x.TipoDocumento).HasMaxLength(80).IsRequired();
+            e.Property(x => x.NombreArchivo).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RutaArchivo).HasMaxLength(400).IsRequired();
+
+            e.HasOne(x => x.Despacho)
+             .WithMany()
+             .HasForeignKey(x => x.IdDespacho)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.UsuarioCargador)
+             .WithMany()
+             .HasForeignKey(x => x.IdUsuarioCargador)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── ITEM_FACTURA ──────────────────────────────────────────
+        modelBuilder.Entity<ItemFactura>(e => {
+            e.HasKey(x => x.IdItem);
+            e.Property(x => x.Descripcion).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Cantidad).HasColumnType("numeric(12,3)");
+            e.Property(x => x.Valor).HasColumnType("numeric(14,2)");
+            e.Property(x => x.Peso).HasColumnType("numeric(10,3)");
+            e.Property(x => x.PartidaArancelaria).HasMaxLength(10);
+            e.Property(x => x.UsuarioModificacion).HasMaxLength(150);
+
+            e.HasOne(x => x.Despacho)
+             .WithMany()
+             .HasForeignKey(x => x.IdDespacho)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ── AUDITORIA ─────────────────────────────────────────

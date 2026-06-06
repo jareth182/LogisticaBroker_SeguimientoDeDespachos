@@ -100,6 +100,28 @@ public class DAMController : ControllerBase
         }
     }
 
+    // ─────────────────────────────────────────────────────────
+    // POST /api/DAM/{idDespacho}/confirmar-borrador
+    // HU12: valida que todos los ítems tengan partida y cambia estado
+    // ─────────────────────────────────────────────────────────
+    [HttpPost("{idDespacho}/confirmar-borrador")]
+    public async Task<IActionResult> ConfirmarBorrador(int idDespacho)
+    {
+        try
+        {
+            var result = await _damService.ConfirmarBorradorAsync(idDespacho);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { mensaje = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+    }
+
     // GET /api/DAM/{idDespacho}/etapas
     [HttpGet("{idDespacho}/etapas")]
     public async Task<IActionResult> ObtenerEtapas(int idDespacho)

@@ -12,14 +12,19 @@ import ListaDespachos from './Components/Despachos/ListaDespachos';
 import ListaLiquidaciones from './Components/Despachos/ListaLiquidaciones';
 import ClasificacionArancelaria from './Components/Despachos/ClasificacionArancelaria';
 import AdjuntarDocumentosLegales from './Components/Documentos/AdjuntarDocumentosLegales';
+import DocumentacionLogistica from './Components/Despachos/DocumentacionLogistica';
+import ExtraerDatosFactura from './Components/Despachos/ExtraerDatosFactura';
+import EditarDetalleMercancia from './Components/Despachos/EditarDetalleMercancia';
+import BorradorDAMFinal from './Components/Despachos/BorradorDAMFinal';
 
 export default function App() {
   const [usuario, setUsuario]           = useState(null);
   const [pantallaAuth, setPantallaAuth] = useState('login');
   const [view, setView]                 = useState('despachos');
   const [despachoActivo, setDespachoActivo] = useState(null);
-  const [liquidacionDespacho, setLiquidacionDespacho] = useState(null); 
+  const [liquidacionDespacho, setLiquidacionDespacho] = useState(null);
   const [clasificacionDespacho, setClasificacionDespacho] = useState(null);
+  const [itemsExtraidos, setItemsExtraidos] = useState([]);
   const [isCollapsed, setIsCollapsed]   = useState(() => {
     try { return localStorage.getItem('sidebarCollapsed') === 'true'; } catch { return false; }
   });
@@ -236,11 +241,11 @@ export default function App() {
               <ListaDespachos
                   onVerDetalle={handleVerDetalle}
                   onNuevoDespacho={() => setView('nuevo-despacho')}
-                onVerLiquidaciones={(d) => {
-                  setLiquidacionDespacho(d);
-                  setView('liquidaciones');
-                }}
-                onClasificacion={(d) => { setClasificacionDespacho(d); setView('clasificacion'); }}
+                  onVerLiquidaciones={(d) => { setLiquidacionDespacho(d); setView('liquidaciones'); }}
+                  onClasificacion={(d) => { setClasificacionDespacho(d); setView('clasificacion'); }}
+                  onDocumentacion={(d) => { setDespachoActivo(d); setView('documentacion-logistica'); }}
+                  onExtraerFactura={(d) => { setDespachoActivo(d); setView('extraer-factura'); }}
+                  onBorradorDAM={(d) => { setDespachoActivo(d); setView('borrador-dam-final'); }}
               />
           )}
 
@@ -297,6 +302,47 @@ export default function App() {
                   despacho={clasificacionDespacho}
                   onVolver={() => setView('despachos')}
                   onVerLiquidaciones={(d) => { setLiquidacionDespacho(d); setView('liquidaciones'); }}
+              />
+          )}
+
+          {/* ── HU09: Documentación Logística ── */}
+          {view === 'documentacion-logistica' && despachoActivo && (
+              <DocumentacionLogistica
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+              />
+          )}
+
+          {/* ── HU10: Extraer Datos Factura ── */}
+          {view === 'extraer-factura' && despachoActivo && (
+              <ExtraerDatosFactura
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  onIrEditar={(items) => {
+                      setItemsExtraidos(items);
+                      setView('editar-detalle');
+                  }}
+              />
+          )}
+
+          {/* ── HU11: Editar Detalle Mercancía ── */}
+          {view === 'editar-detalle' && despachoActivo && (
+              <EditarDetalleMercancia
+                  despacho={despachoActivo}
+                  itemsIniciales={itemsExtraidos}
+                  onVolver={() => setView('extraer-factura')}
+                  onIrBorrador={() => setView('borrador-dam-final')}
+              />
+          )}
+
+          {/* ── HU12: Generar Borrador DAM ── */}
+          {view === 'borrador-dam-final' && despachoActivo && (
+              <BorradorDAMFinal
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  onGenerado={(nuevoEstado) => {
+                      setDespachoActivo(prev => prev ? { ...prev, estado: nuevoEstado } : prev);
+                  }}
               />
           )}
 

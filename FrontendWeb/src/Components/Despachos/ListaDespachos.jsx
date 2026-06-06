@@ -143,7 +143,7 @@ function ModalDetalle({ despacho, onCerrar, onVerLiquidaciones }) {
 }
 
 /* ── Menú acciones ────────────────────────────────────────── */
-function MenuAcciones({ despacho, onDetalle, onVerDetalle, onVerLiquidaciones, onClasificacion, onEliminar }) {
+function MenuAcciones({ despacho, onDetalle, onVerDetalle, onVerLiquidaciones, onClasificacion, onEliminar, onDocumentacion, onExtraerFactura, onBorradorDAM }) {
     const [abierto, setAbierto] = useState(false);
     const ref = useRef(null);
 
@@ -181,6 +181,21 @@ function MenuAcciones({ despacho, onDetalle, onVerDetalle, onVerLiquidaciones, o
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#e0f7fa] text-left border-t border-gray-50">
                         <svg className="w-4 h-4 text-[#008b9c]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                         <span className="text-[#008b9c] font-medium">Clasificación arancelaria</span>
+                    </button>
+                    <button onClick={() => { setAbierto(false); onDocumentacion?.(despacho); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#e0f7fa] text-left border-t border-gray-50">
+                        <svg className="w-4 h-4 text-[#008b9c]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                        <span className="text-[#008b9c] font-medium">Documentación logística</span>
+                    </button>
+                    <button onClick={() => { setAbierto(false); onExtraerFactura?.(despacho); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#e0f7fa] text-left border-t border-gray-50">
+                        <svg className="w-4 h-4 text-[#008b9c]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <span className="text-[#008b9c] font-medium">Extraer factura</span>
+                    </button>
+                    <button onClick={() => { setAbierto(false); onBorradorDAM?.(despacho); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#e0f7fa] text-left border-t border-gray-50">
+                        <svg className="w-4 h-4 text-[#008b9c]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="text-[#008b9c] font-medium">Generar borrador DAM</span>
                     </button>
                     <button onClick={() => { setAbierto(false); onVerLiquidaciones?.(despacho); }}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-[#e0f7fa] text-left border-t border-gray-50">
@@ -231,7 +246,7 @@ function ModalEliminar({ despacho, onConfirmar, onCancelar, loading }) {
 }
 
 /* ── Componente principal ─────────────────────────────────── */
-export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onVerLiquidaciones, onClasificacion }) {
+export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onVerLiquidaciones, onClasificacion, onDocumentacion, onExtraerFactura, onBorradorDAM }) {
     const [despachos, setDespachos]             = useState([]);
     const [loading, setLoading]                 = useState(true);
     const [busqueda, setBusqueda]               = useState('');
@@ -513,6 +528,9 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onVerLiq
                                             onVerLiquidaciones={onVerLiquidaciones}
                                             onClasificacion={onClasificacion}
                                             onEliminar={setModalEliminar}
+                                            onDocumentacion={onDocumentacion}
+                                            onExtraerFactura={onExtraerFactura}
+                                            onBorradorDAM={onBorradorDAM}
                                         />
                                     </td>
                                 </tr>

@@ -181,6 +181,100 @@ public class DAMService
             FechaFinalizacion      = d.FechaFinalizacion
     };
 
+    // ─────────────────────────────────────────────────────────
+    // POST /api/DAM/{idDespacho}/confirmar-borrador  — HU12
+    // ─────────────────────────────────────────────────────────
+    public async Task<object> ConfirmarBorradorAsync(int idDespacho)
+    {
+        var despacho = await _uow.Despachos.GetByIdAsync(idDespacho)
+            ?? throw new KeyNotFoundException("Despacho no encontrado");
+
+        // Verificar que no esté ya en borrador finalizado
+        if (despacho.Estado == "Borrador Finalizado") // PA HU12-1.4 NOK — borrador ya generado previamente
+            throw new InvalidOperationException(
+                "Este despacho ya cuenta con un borrador DAM generado. Si desea regenerarlo, debe revertir el estado del expediente desde el panel de administración.");
+
+        // Verificar que todos los ítems tienen partida arancelaria
+        var itemsSinPartida = await _context.ItemsFactura
+            .Where(i => i.IdDespacho == idDespacho &&
+                        (i.PartidaArancelaria == null || i.PartidaArancelaria == ""))
+            .CountAsync();
+
+        if (itemsSinPartida > 0) // PA HU12-1.1 NOK — existen ítems sin partida arancelaria asignada
+            throw new InvalidOperationException(
+                "No se puede generar el borrador. Hay ítems sin partida arancelaria asignada. Complete todos los campos antes de continuar.");
+
+        // Obtener todos los ítems para el resumen PDF
+        var items = await _context.ItemsFactura
+            .Where(i => i.IdDespacho == idDespacho)
+            .ToListAsync();
+
+        if (items.Count == 0)
+            throw new InvalidOperationException(
+                "No se puede generar el borrador. No hay ítems de factura registrados para este despacho.");
+
+        // Calcular totales para el PDF
+        decimal valorCifTotal = items.Sum(i => i.Valor);
+        decimal pesoBrutoTotal = items.Sum(i => i.Peso * i.Cantidad);
+
+        // Tributos estimados (tasas estándar Perú)
+        decimal adValorem = Math.Round(valorCifTotal * 0.06m, 2);
+        decimal igv       = Math.Round((valorCifTotal + adValorem) * 0.16m, 2);
+        decimal ipm       = Math.Round((valorCifTotal + adValorem) * 0.02m, 2);
+        decimal totalTributos = adValorem + igv + ipm;
+
+        // PA HU12-1 OK — todos los ítems clasificados, se cambia estado del despacho
+        despacho.Estado = "Borrador Finalizado";
+
+        // Registrar etapa
+        var etapaExistente = await _context.EtapasDespacho
+            .FirstOrDefaultAsync(e => e.IdDespacho == idDespacho && e.IdTipoEtapa == 4);
+
+        if (etapaExistente is null)
+        {
+            _context.EtapasDespacho.Add(new EtapaDespacho
+            {
+                IdDespacho   = idDespacho,
+                IdTipoEtapa  = 4,
+                Estado       = "Finalizado",
+                Descripcion  = "Borrador DAM generado exitosamente",
+                FechaHora    = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            etapaExistente.Estado    = "Finalizado";
+            etapaExistente.FechaHora = DateTime.UtcNow;
+        }
+
+        await _uow.SaveChangesAsync();
+
+        return new
+        {
+            estado           = despacho.Estado,
+            codigoOrden      = despacho.CodigoOrden,
+            totalItems       = items.Count,
+            pesoBrutoTotal,
+            valorCifTotal,
+            tributos = new
+            {
+                adValorem,
+                igv,
+                ipm,
+                total = totalTributos
+            },
+            items = items.Select(i => new
+            {
+                i.Descripcion,
+                i.PartidaArancelaria,
+                i.Cantidad,
+                i.Valor,
+                i.Peso,
+                i.TieneRestriccion
+            })
+        };
+    }
+
     public async Task<DamResponseDto> ActualizarBorradorAsync(int idDespacho, CrearDamDto dto)
     {
         var dam = await _uow.Dams.GetByDespachoAsync(idDespacho)
