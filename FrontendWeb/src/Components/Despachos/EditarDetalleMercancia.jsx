@@ -11,6 +11,7 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
     const [busqueda, setBusqueda] = useState('');
     const [guardandoTodo, setGuardandoTodo] = useState(false);
     const [msgGlobal, setMsgGlobal] = useState(null);
+    const [itemModal, setItemModal] = useState(null); // CA5: modal detalle
 
     const filtrados = items.filter(it =>
         it.descripcion.toLowerCase().includes(busqueda.toLowerCase())
@@ -23,13 +24,13 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
     };
 
     const validarItem = (it) => {
-        if (!it.partidaArancelaria?.trim()) // PA HU11-2.1 NOK — campo vacío; cubre también PA HU11-3.1 NOK (restricción sin partida)
-            return 'El campo de partida arancelaria es obligatorio.';
-        if (it.tieneRestriccion && !it.partidaArancelaria?.trim()) // PA HU11-3.1 NOK — restricción marcada sin partida (dead branch: ya capturado arriba)
-            return 'Debe completar la partida arancelaria antes de registrar restricciones técnicas.';
-        if (!/^\d{10}$/.test(it.partidaArancelaria.trim())) // PA HU11-2.2 NOK — formato inválido (letras, guiones, longitud ≠ 10)
-            return 'La partida arancelaria debe contener únicamente caracteres numéricos con el formato oficial del arancel de aduanas.';
-        return null; // PA HU11-2 OK / HU11-3 OK — partida válida (10 dígitos numéricos)
+        if (it.tieneRestriccion && !it.partidaArancelaria?.trim())
+            return 'Completa la partida arancelaria antes de guardar';
+        if (!it.partidaArancelaria?.trim())
+            return 'La partida arancelaria debe contener exactamente 10 dígitos numéricos';
+        if (!/^\d{10}$/.test(it.partidaArancelaria.trim()))
+            return 'La partida arancelaria debe contener exactamente 10 dígitos numéricos';
+        return null;
     };
 
     // Guarda todos los ítems extraídos en BD (sin partidas aún) y luego actualiza uno a uno con partidas
@@ -84,21 +85,59 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                 });
             }
 
-            setMsgGlobal({ tipo: 'exito', texto: '¡Todos los detalles guardados correctamente! Puede proceder a generar el borrador DAM.' }); // PA HU11-2 OK / HU11-3 OK — partidas y/o restricciones guardadas
+            setMsgGlobal({ tipo: 'exito', texto: 'Cambios guardados correctamente.' });
             setItems(prev => prev.map(it => ({ ...it, _guardado: true })));
 
-        } catch { // PA HU11-2.3 NOK / HU11-3.2 NOK — error de red al guardar
-            setMsgGlobal({ tipo: 'error', texto: 'No se pudo guardar el detalle. Verifique su conexión e intente nuevamente.' });
+        } catch {
+            setMsgGlobal({ tipo: 'error', texto: 'Error al guardar los cambios. Intenta nuevamente' });
         } finally {
             setGuardandoTodo(false);
         }
     };
 
-    const todosGuardados = items.every(it => it._guardado);
-    const totalItems = items.length;
-    const clasificados = items.filter(it => it.partidaArancelaria?.length === 10 && /^\d{10}$/.test(it.partidaArancelaria)).length;
+    const handleEliminarItem = async (it) => {
+        try {
+            setItems(prev => prev.filter(x => x._idx !== it._idx));
+        } catch {
+            setMsgGlobal({ tipo: 'error', texto: 'Error al eliminar el ítem. Intenta nuevamente' });
+        }
+    };
+
 
     return (
+        <>
+            {itemModal && (
+            <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+                onClick={() => setItemModal(null)}
+            >
+                <div
+                    className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4"
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base font-bold text-gray-900">Detalle del Ítem</h3>
+                        <button onClick={() => setItemModal(null)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <dl className="space-y-2 text-sm">
+                        {[
+                            ['Descripción', itemModal.descripcion],
+                            ['Cantidad',    itemModal.cantidad],
+                            ['Valor (USD)', itemModal.valor],
+                            ['Peso (kg)',   itemModal.peso],
+                        ].map(([label, val]) => (
+                            <div key={label} className="flex justify-between gap-4">
+                                <dt className="text-gray-400 shrink-0">{label}</dt>
+                                <dd className="font-semibold text-gray-800 text-right">{val || '—'}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            </div>
+        )}
+
         <div className="max-w-6xl mx-auto">
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
@@ -141,22 +180,11 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                     </div>
                 </div>
 
-                {/* Progreso */}
-                <div className="mt-3 flex items-center gap-4">
+                {/* Contador — actualiza al eliminar */}
+                <div className="mt-3">
                     <span className="text-xs text-gray-500">
-                        Mostrando {totalItems} ítems extraídos
+                        Mostrando {items.length} ítems extraídos
                     </span>
-                    <div className="flex items-center gap-2 ml-auto">
-                        <div className="w-32 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-[#008b9c] rounded-full transition-all"
-                                style={{ width: `${totalItems > 0 ? (clasificados / totalItems) * 100 : 0}%` }}
-                            />
-                        </div>
-                        <span className={`text-xs font-semibold ${clasificados === totalItems && totalItems > 0 ? 'text-[#008b9c]' : 'text-gray-400'}`}>
-                            {clasificados}/{totalItems} clasificados
-                        </span>
-                    </div>
                 </div>
             </div>
 
@@ -183,6 +211,13 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                 />
             </div>
 
+            {/* CA1.1 — sin ítems extraídos */}
+            {items.length === 0 && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                    No hay ítems extraídos para editar. Primero extrae los datos de la factura
+                </div>
+            )}
+
             {/* Tabla */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                 <table className="w-full text-sm text-left">
@@ -192,7 +227,7 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                             <th className="px-4 py-3">Descripción del Ítem</th>
                             <th className="px-4 py-3 w-52">Partida Arancelaria (10 dígitos)</th>
                             <th className="px-4 py-3 w-36 text-center">Restricciones</th>
-                            <th className="px-4 py-3 w-20 text-center">Estado</th>
+                            <th className="px-4 py-3 w-20 text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -208,7 +243,7 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                                         </p>
                                         {it.tieneRestriccion && (
                                             <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full font-semibold">
-                                                ⚠ Restricción requerida
+                                                ⚠ Revisión requerida
                                             </span>
                                         )}
                                     </td>
@@ -251,13 +286,24 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                                         </label>
                                     </td>
                                     <td className="px-4 py-3 text-center">
-                                        {it._guardado ? (
-                                            <svg className="w-5 h-5 text-green-500 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                        ) : valido ? (
-                                            <div className="w-2 h-2 rounded-full bg-[#008b9c] mx-auto" />
-                                        ) : (
-                                            <div className="w-2 h-2 rounded-full bg-gray-300 mx-auto" />
-                                        )}
+                                        <div className="flex items-center justify-center gap-1">
+                                            {/* CA5 — ver detalle */}
+                                            <button
+                                                onClick={() => setItemModal(it)}
+                                                title="Ver detalle"
+                                                className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-500 transition-colors"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                            </button>
+                                            {/* CA4 — eliminar ítem */}
+                                            <button
+                                                onClick={() => handleEliminarItem(it)}
+                                                title="Eliminar ítem"
+                                                className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             );
@@ -266,23 +312,16 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                 </table>
             </div>
 
-            {/* Ir a borrador */}
-            {todosGuardados && (
-                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                        <p className="text-sm font-semibold text-green-800">
-                            Todos los ítems han sido clasificados. Puede generar el borrador DAM.
-                        </p>
-                    </div>
-                    <button
-                        onClick={onIrBorrador}
-                        className="px-4 py-2 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#0f1a30] transition-colors"
-                    >
-                        Generar Borrador DAM →
-                    </button>
-                </div>
-            )}
+            {/* Botón para ir al borrador DAM — disponible siempre tras guardar */}
+            <div className="mt-4 flex justify-end">
+                <button
+                    onClick={onIrBorrador}
+                    className="px-4 py-2 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#0f1a30] transition-colors"
+                >
+                    Generar Borrador DAM →
+                </button>
+            </div>
         </div>
+        </>
     );
 }

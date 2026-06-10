@@ -1,13 +1,12 @@
 import { useState, useRef } from 'react';
-
-const API = 'http://localhost:5018/api/Factura';
+import * as XLSX from 'xlsx';
 
 export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) {
-    const [archivo, setArchivo]   = useState(null);
-    const [dragging, setDragging] = useState(false);
+    const [archivo, setArchivo]       = useState(null);
+    const [dragging, setDragging]     = useState(false);
     const [extrayendo, setExtrayendo] = useState(false);
-    const [items, setItems]       = useState([]);
-    const [error, setError]       = useState(null);
+    const [items, setItems]           = useState([]);
+    const [error, setError]           = useState(null);
     const inputRef = useRef();
 
     const onFileChange = (file) => {
@@ -15,12 +14,12 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
         setError(null);
         setItems([]);
         const ext = file.name.split('.').pop().toLowerCase();
-        if (ext !== 'xlsx' && ext !== 'xls') { // PA HU10-1.2 NOK — formato de archivo incorrecto (PDF, exe, etc.)
-            setError('Formato no válido. Solo se admiten archivos Excel (.xlsx o .xls) para la extracción de datos.');
+        if (ext !== 'xlsx' && ext !== 'xls') {
+            setError('El formato del archivo no es válido. Solo se aceptan XLSX y XLS');
             setArchivo(null);
             return;
         }
-        setArchivo(file); // PA HU10-1 OK (parcial) — archivo Excel válido seleccionado
+        setArchivo(file);
     };
 
     const handleDrop = (e) => {
@@ -28,25 +27,62 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
         onFileChange(e.dataTransfer.files[0]);
     };
 
-    const handleExtraer = async () => {
-        if (!archivo) { // PA HU10-1.1 NOK — no se seleccionó ningún archivo
+    const handleExtraer = () => {
+        if (!archivo) {
             setError('Debe seleccionar un archivo Excel antes de continuar.');
             return;
         }
         setExtrayendo(true); setError(null);
-        const form = new FormData();
-        form.append('archivo', archivo);
-        try {
-            const res = await fetch(`${API}/extraer`, { method: 'POST', body: form });
-            const data = await res.json();
-            if (res.ok) { // PA HU10-1 OK — extracción exitosa, tabla de ítems disponible
-                setItems(data);
-            } else { // PA HU10-1.3 NOK / HU10-1.4 NOK — backend rechaza (columnas incorrectas o sin filas)
-                setError(data.mensaje || 'No se pudo procesar el archivo. Verifique su conexión e intente nuevamente.');
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                const extracted = rows.slice(1)
+                    .filter(row => row.some(cell => cell !== undefined && cell !== ''))
+                    .map(row => ({
+                        cantidad:    row[0] ?? '',
+                        descripcion: row[1] ?? '',
+                        valor:       row[2] ?? '',
+                        peso:        row[3] ?? ''
+                    }));
+                if (extracted.length === 0) {
+                    setError('El archivo no contiene ítems para extraer');
+                } else {
+                    // Verificar que al menos haya datos en alguna columna esperada
+                    const tieneColumnas = extracted.some(r => r.cantidad !== '' || r.descripcion !== '' || r.valor !== '' || r.peso !== '');
+                    if (!tieneColumnas) {
+                        setError('El archivo no contiene las columnas requeridas: Cantidad, Descripción, Valor, Peso');
+                    } else {
+                        setItems(extracted);
+                    }
+                }
+            } catch {
+                setError('No se pudo procesar el archivo. Verifica que el archivo no esté dañado');
+            } finally {
+                setExtrayendo(false);
             }
-        } catch { // PA HU10-1.5 NOK — error de conexión durante el procesamiento
-            setError('No se pudo procesar el archivo. Verifique su conexión e intente nuevamente.');
-        } finally { setExtrayendo(false); }
+        };
+        reader.onerror = () => {
+            setError('No se pudo leer el archivo.');
+            setExtrayendo(false);
+        };
+        reader.readAsArrayBuffer(archivo);
+    };
+
+    const handleDescargarPreview = () => {
+        if (items.length === 0) return;
+        const ws = XLSX.utils.json_to_sheet(items.map(it => ({
+            Cantidad:    it.cantidad,
+            Descripción: it.descripcion,
+            Valor:       it.valor,
+            Peso:        it.peso
+        })));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Vista Previa');
+        XLSX.writeFile(wb, `preview_items_${despacho.codigoOrden}.xlsx`);
     };
 
     return (
@@ -74,7 +110,7 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
             </div>
 
             <div className="grid grid-cols-2 gap-6">
-                {/* ── Columna izquierda: carga ── */}
+                {/* ── Columna izquierda ── */}
                 <div className="space-y-4">
                     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
                         <h2 className="text-sm font-bold text-gray-700 mb-4">Archivo Fuente</h2>
@@ -85,7 +121,7 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                             onDragLeave={() => setDragging(false)}
                             onDrop={handleDrop}
                             onClick={() => inputRef.current?.click()}
-                            className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all mb-4 ${
+                            className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-all mb-3 ${
                                 dragging ? 'border-[#008b9c] bg-[#e0f7fa]' :
                                 archivo  ? 'border-green-400 bg-green-50' :
                                            'border-gray-300 bg-gray-50 hover:border-[#008b9c]'
@@ -107,19 +143,27 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                             ) : (
                                 <>
                                     <svg className="w-10 h-10 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                    <p className="text-sm font-semibold text-gray-500">Arrastre el archivo Excel aquí</p>
-                                    <p className="text-xs text-gray-400 mt-1">o haga clic para examinar</p>
-                                    <p className="text-xs text-gray-400">[XLSX, XLS]</p>
+                                    <p className="text-sm font-semibold text-gray-500">Arrastre el archivo Excel aquí o haga clic para examinar</p>
+                                    <p className="text-xs text-gray-400 mt-1">(XLSX, XLS)</p>
                                 </>
                             )}
                         </div>
 
+                        {/* Botón Seleccionar Archivo — CA1 */}
+                        <button
+                            onClick={() => inputRef.current?.click()}
+                            className="w-full py-2 mb-3 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                            Seleccionar Archivo
+                        </button>
+
+                        {/* Botón Extraer Datos — CA2 */}
                         <button
                             onClick={handleExtraer}
                             disabled={extrayendo || !archivo}
                             className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                                 extrayendo || !archivo
-                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
                                     : 'bg-[#008b9c] text-white hover:bg-[#007685]'
                             }`}
                         >
@@ -137,11 +181,9 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                         )}
                     </div>
 
-                    {/* Contexto DUA */}
+                    {/* Contexto DUA — solo lectura */}
                     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Contexto DUA</p>
-                        </div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Contexto DUA</p>
                         <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-gray-500">Régimen</span>
@@ -159,22 +201,36 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                     </div>
                 </div>
 
-                {/* ── Columna derecha: preview ── */}
+                {/* ── Columna derecha: Vista Previa ── */}
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-bold text-gray-700">Vista Previa de Ítems</h2>
-                        {items.length > 0 && (
-                            <span className="px-2.5 py-1 bg-[#e0f7fa] text-[#008b9c] text-xs font-bold rounded-full">
-                                {items.length} ítems
-                            </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {items.length > 0 && (
+                                <span className="px-2.5 py-1 bg-[#e0f7fa] text-[#008b9c] text-xs font-bold rounded-full">
+                                    {items.length} ítems
+                                </span>
+                            )}
+                            {/* Ícono descarga — CA3 */}
+                            <button
+                                onClick={handleDescargarPreview}
+                                disabled={items.length === 0}
+                                title="Descargar tabla en Excel"
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                    items.length === 0
+                                        ? 'text-gray-300 cursor-not-allowed'
+                                        : 'text-gray-400 hover:bg-[#e0f7fa] hover:text-[#008b9c]'
+                                }`}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            </button>
+                        </div>
                     </div>
 
                     {items.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-gray-300">
                             <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                            <p className="text-sm text-gray-400 text-center">No hay datos extraídos</p>
-                            <p className="text-xs text-gray-400 text-center mt-1">Cargue un archivo y ejecute la extracción para visualizar la clasificación técnica de los ítems de la factura.</p>
+                            <p className="text-sm text-gray-400 text-center">No hay datos extraídos. Cargue un archivo y ejecute la extracción para visualizar la clasificación técnica de los ítems de la factura.</p>
                         </div>
                     ) : (
                         <>
@@ -182,9 +238,8 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                                 <table className="w-full text-sm text-left">
                                     <thead>
                                         <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">
-                                            <th className="pb-3 pr-3">#</th>
+                                            <th className="pb-3 pr-3 text-right">Cantidad</th>
                                             <th className="pb-3 pr-3">Descripción</th>
-                                            <th className="pb-3 pr-3 text-right">Cant.</th>
                                             <th className="pb-3 pr-3 text-right">Valor</th>
                                             <th className="pb-3 text-right">Peso</th>
                                         </tr>
@@ -192,13 +247,12 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                                     <tbody className="divide-y divide-gray-50">
                                         {items.map((it, i) => (
                                             <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                                <td className="py-2.5 pr-3 text-gray-400 text-xs">{i + 1}</td>
+                                                <td className="py-2.5 pr-3 text-right text-gray-600">{it.cantidad}</td>
                                                 <td className="py-2.5 pr-3 text-gray-800 font-medium max-w-[180px]">
                                                     <p className="truncate">{it.descripcion}</p>
                                                 </td>
-                                                <td className="py-2.5 pr-3 text-right text-gray-600">{it.cantidad}</td>
-                                                <td className="py-2.5 pr-3 text-right text-gray-600">${it.valor.toFixed(2)}</td>
-                                                <td className="py-2.5 text-right text-gray-600">{it.peso} kg</td>
+                                                <td className="py-2.5 pr-3 text-right text-gray-600">{it.valor}</td>
+                                                <td className="py-2.5 text-right text-gray-600">{it.peso}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -209,11 +263,8 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                                     onClick={() => onIrEditar(items)}
                                     className="w-full py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#0f1a30] transition-colors"
                                 >
-                                    Clasificar Ítems →
+                                    Editar →
                                 </button>
-                                <p className="text-xs text-gray-400 text-center mt-2">
-                                    Revise los ítems y continue para asignar la partida arancelaria a cada uno.
-                                </p>
                             </div>
                         </>
                     )}

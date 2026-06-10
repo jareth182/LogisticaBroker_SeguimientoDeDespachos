@@ -17,6 +17,11 @@ import DocumentacionLogistica from './Components/Despachos/DocumentacionLogistic
 import ExtraerDatosFactura from './Components/Despachos/ExtraerDatosFactura';
 import EditarDetalleMercancia from './Components/Despachos/EditarDetalleMercancia';
 import BorradorDAMFinal from './Components/Despachos/BorradorDAMFinal';
+import LiquidacionTributaria from './Components/Despachos/LiquidacionTributaria';
+import AdjuntarComprobantes from './Components/Despachos/AdjuntarComprobantes';
+import ValidarComprobantes from './Components/Despachos/ValidarComprobantes';
+import RegistrarNumeracion from './Components/Despachos/RegistrarNumeracion';
+import RegistrarObservacionesAforo from './Components/Despachos/RegistrarObservacionesAforo';
 
 function tokenEstaExpirado(token) {
   try {
@@ -277,6 +282,11 @@ export default function App() {
               <ListaDespachos
                   onVerDetalle={handleVerDetalle}
                   onNuevoDespacho={() => setView('nuevo-despacho')}
+                  onVerTributos={(d) => { setDespachoActivo(d); setView('liquidacion-tributaria'); }}
+                  onAdjuntarComprobantes={(d) => { setDespachoActivo(d); setView('adjuntar-comprobantes'); }}
+                  onValidarComprobantes={(d) => { setDespachoActivo(d); setView('validar-comprobantes'); }}
+                  onRegistrarNumeracion={(d) => { setDespachoActivo(d); setView('registrar-numeracion'); }}
+                  onObservacionesAforo={(d) => { setDespachoActivo(d); setView('observaciones-aforo'); }}
               />
           )}
 
@@ -374,6 +384,50 @@ export default function App() {
                   onGenerado={(nuevoEstado) => {
                       setDespachoActivo(prev => prev ? { ...prev, estado: nuevoEstado } : prev);
                   }}
+              />
+          )}
+
+          {/* ── HU13: Liquidación Tributaria ── */}
+          {view === 'liquidacion-tributaria' && (
+              <LiquidacionTributaria
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
+          {/* ── HU14: Adjuntar Comprobantes ── */}
+          {view === 'adjuntar-comprobantes' && (
+              <AdjuntarComprobantes
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+              />
+          )}
+
+          {/* ── HU15: Validar Comprobantes ── */}
+          {view === 'validar-comprobantes' && (
+              <ValidarComprobantes
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
+          {/* ── HU16: Registrar Numeración Aduanera ── */}
+          {view === 'registrar-numeracion' && (
+              <RegistrarNumeracion
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  onRegistrado={() => {}}
+              />
+          )}
+
+          {/* ── HU17: Registrar Observaciones Aforo ── */}
+          {view === 'observaciones-aforo' && (
+              <RegistrarObservacionesAforo
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
               />
           )}
 

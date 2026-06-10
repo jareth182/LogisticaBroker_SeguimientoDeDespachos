@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 const API = 'http://localhost:5018/api/DocumentosLogisticos';
-const TIPOS = ['Factura Comercial', 'Packing List', 'Bill of Lading', 'Otros'];
+const TIPOS = ['Factura Comercial', 'Packing List', 'Bill of Lading'];
 
 function icono(nombre) {
     const ext = nombre.split('.').pop().toLowerCase();
@@ -37,25 +37,29 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
     const [mensaje, setMensaje]   = useState(null);
     const inputRef = useRef();
 
+    const [errorCarga, setErrorCarga] = useState(null);
+
     useEffect(() => { cargar(); }, [despacho.idDespacho]);
 
     const cargar = async () => {
         setLoading(true);
+        setErrorCarga(null);
         try {
             const res = await fetch(`${API}/${despacho.idDespacho}`);
-            if (res.ok) setDocs(await res.json()); // PA HU09-1 OK — lista de documentos cargada
-        } catch { /* PA HU09-1.2 NOK — sin conexión, pantalla no carga */ }
-        finally { setLoading(false); }
+            if (res.ok) setDocs(await res.json());
+        } catch {
+            setErrorCarga('Error al cargar la documentación. Intenta nuevamente');
+        } finally { setLoading(false); }
     };
 
     const validarArchivo = (file) => {
         if (!file) return null;
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['pdf', 'jpg', 'jpeg', 'png', 'xls', 'xlsx'].includes(ext))
-            return 'Formato no admitido. Solo se permiten archivos PDF, JPG, PNG o Excel.'; // PA HU09-2.2 NOK — extensión no permitida (.exe, .doc, etc.)
+            return 'El formato del archivo no es válido. Solo se aceptan PDF, JPG, PNG y Excel';
         if (file.size > 10 * 1024 * 1024)
-            return 'El archivo supera el límite permitido de 10 MB. Comprima o reduzca el tamaño antes de subirlo.'; // PA HU09-2.1 NOK — tamaño excede 10 MB
-        return null; // PA HU09-2 OK — archivo válido (formato y tamaño correctos)
+            return 'El archivo supera el tamaño máximo permitido de 10 MB';
+        return null;
     };
 
     const onFileChange = (file) => {
@@ -72,12 +76,16 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
     };
 
     const handleSubir = async () => {
-        if (!tipo) { // PA HU09-2.3 NOK — tipo de documento no seleccionado
-            setMensaje({ tipo: 'error', texto: 'Debe seleccionar el tipo de documento antes de subir el archivo.' });
+        if (despacho.estado === 'Terminado') {
+            setMensaje({ tipo: 'error', texto: 'No se pueden adjuntar documentos a un despacho en estado Terminado' });
             return;
         }
-        if (!archivo) { // guarda: archivo no elegido aún (cubierto por validarArchivo)
-            setMensaje({ tipo: 'error', texto: 'Debe seleccionar un archivo antes de subir.' });
+        if (!tipo) {
+            setMensaje({ tipo: 'error', texto: 'Selecciona el tipo de documento antes de continuar' });
+            return;
+        }
+        if (!archivo) {
+            setMensaje({ tipo: 'error', texto: 'Debes adjuntar un archivo antes de continuar' });
             return;
         }
         setSubiendo(true);
@@ -93,25 +101,39 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                 setArchivo(null); setTipo('');
                 if (inputRef.current) inputRef.current.value = '';
                 cargar();
-            } else { // PA HU09-2.4 NOK — servidor responde con error (p.ej. formato/tamaño rechazado en backend)
-                setMensaje({ tipo: 'error', texto: data.mensaje || 'Error al subir el documento. Verifique su conexión e intente nuevamente.' });
+            } else {
+                setMensaje({ tipo: 'error', texto: data.mensaje || 'Error al subir el archivo. Intenta nuevamente' });
             }
-        } catch { // PA HU09-2.4 NOK — error de red / sin conexión al subir
-            setMensaje({ tipo: 'error', texto: 'Error al subir el documento. Verifique su conexión e intente nuevamente.' });
+        } catch {
+            setMensaje({ tipo: 'error', texto: 'Error al subir el archivo. Intenta nuevamente' });
         } finally { setSubiendo(false); }
+    };
+
+    const handleEliminar = async (doc) => {
+        if (!window.confirm(`¿Eliminar "${doc.nombreArchivo}"?`)) return;
+        try {
+            const res = await fetch(`${API}/${doc.idDocumentoLogistico}`, { method: 'DELETE' });
+            if (res.ok) {
+                setDocs(prev => prev.filter(d => d.idDocumentoLogistico !== doc.idDocumentoLogistico));
+            } else {
+                setMensaje({ tipo: 'error', texto: 'Error al eliminar el archivo. Intenta nuevamente' });
+            }
+        } catch {
+            setMensaje({ tipo: 'error', texto: 'Error al eliminar el archivo. Intenta nuevamente' });
+        }
     };
 
     const handleDescargar = async (doc) => {
         try {
             const res = await fetch(`${API}/descargar/${doc.idDocumentoLogistico}`);
-            if (res.ok) { // PA HU09-3 OK — descarga exitosa, se abre la URL del archivo
+            if (res.ok) {
                 const data = await res.json();
                 window.open(data.rutaArchivo, '_blank');
-            } else { // PA HU09-3.2 NOK — archivo no disponible en servidor (404)
-                alert('No se pudo descargar el documento. Verifique su conexión e intente nuevamente.');
+            } else {
+                setMensaje({ tipo: 'error', texto: 'No se pudo descargar el archivo. Intenta nuevamente' });
             }
-        } catch { // PA HU09-3.1 NOK — error de red al intentar descargar
-            alert('No se pudo descargar el documento. Verifique su conexión e intente nuevamente.');
+        } catch {
+            setMensaje({ tipo: 'error', texto: 'No se pudo descargar el archivo. Intenta nuevamente' });
         }
     };
 
@@ -125,6 +147,20 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                 <span className="text-[#008b9c] font-semibold">Adjuntar Documentos</span>
             </div>
+
+            {/* CA1.2 — error al cargar */}
+            {errorCarga && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    {errorCarga}
+                </div>
+            )}
+
+            {/* CA1.1 — despacho Terminado */}
+            {despacho.estado === 'Terminado' && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                    No se pueden adjuntar documentos a un despacho en estado Terminado
+                </div>
+            )}
 
             {/* Header */}
             <div className="mb-6">
@@ -201,7 +237,7 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                                 <svg className="w-10 h-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                                 <p className="text-sm font-semibold text-gray-600">Arrastra y suelta tus archivos aquí</p>
                                 <p className="text-xs text-gray-400 mt-1">o haz clic para explorar en tu dispositivo</p>
-                                <p className="text-xs text-gray-400 mt-1">Soporta PDF, XLS, JPG, PNG (Max. 10MB)</p>
+                                <p className="text-xs text-gray-400 mt-1">Soporta PDF, XML, JPG, PNG (Max. 10MB)</p>
                             </>
                         )}
                     </div>
@@ -269,6 +305,13 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                                             className="p-1.5 rounded-lg hover:bg-[#e0f7fa] text-gray-400 hover:text-[#008b9c] transition-colors"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                        </button>
+                                        <button
+                                            onClick={() => handleEliminar(doc)}
+                                            title="Eliminar"
+                                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                         </button>
                                     </div>
                                 );

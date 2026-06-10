@@ -22,8 +22,8 @@ function EstadoBadge({ estado }) {
     );
 }
 
-/* ── Botón de acciones (solo Ver detalle — CA de HU07) ───── */
-function BtnAcciones({ despacho, onVerDetalle }) {
+/* ── Botón de acciones ────────────────────────────────────── */
+function BtnAcciones({ despacho, onVerDetalle, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, esCliente }) {
     const [abierto, setAbierto] = useState(false);
     const ref = useRef(null);
 
@@ -32,6 +32,11 @@ function BtnAcciones({ despacho, onVerDetalle }) {
         document.addEventListener('mousedown', h);
         return () => document.removeEventListener('mousedown', h);
     }, []);
+
+    const estado = despacho.estado || '';
+    const canalNaranjaORojo = estado === 'Canal Naranja' || estado === 'Canal Rojo';
+
+    const accion = (fn) => { setAbierto(false); fn?.(despacho); };
 
     return (
         <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
@@ -43,9 +48,10 @@ function BtnAcciones({ despacho, onVerDetalle }) {
                 ⚙️
             </button>
             {abierto && (
-                <div className="absolute right-0 top-8 z-50 w-44 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                <div className="absolute right-0 top-8 z-50 w-56 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                    {/* Ver detalle — siempre disponible */}
                     <button
-                        onClick={() => { setAbierto(false); onVerDetalle?.(despacho); }}
+                        onClick={() => accion(onVerDetalle)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
                     >
                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,6 +59,69 @@ function BtnAcciones({ despacho, onVerDetalle }) {
                         </svg>
                         Ver detalle
                     </button>
+
+                    {/* HU13: Ver tributos — Admin y Cliente, siempre disponible */}
+                    <button
+                        onClick={() => accion(onVerTributos)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                    >
+                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                        </svg>
+                        Ver liquidación tributaria
+                    </button>
+
+                    {/* HU14: Adjuntar comprobantes — solo Cliente */}
+                    {esCliente && (
+                        <button
+                            onClick={() => accion(onAdjuntarComprobantes)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                            Adjuntar comprobantes
+                        </button>
+                    )}
+
+                    {/* HU15: Validar comprobantes — solo Admin, estado Pago en Verificación */}
+                    {!esCliente && estado === 'Pago en Verificación' && (
+                        <button
+                            onClick={() => accion(onValidarComprobantes)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Validar comprobante
+                        </button>
+                    )}
+
+                    {/* HU16: Registrar numeración — solo Admin, estado Tributos Cancelados */}
+                    {!esCliente && estado === 'Tributos Cancelados' && (
+                        <button
+                            onClick={() => accion(onRegistrarNumeracion)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                            </svg>
+                            Registrar numeración
+                        </button>
+                    )}
+
+                    {/* HU17: Observaciones aforo — solo Admin, canal Naranja o Rojo */}
+                    {!esCliente && canalNaranjaORojo && (
+                        <button
+                            onClick={() => accion(onObservacionesAforo)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Observaciones de aforo
+                        </button>
+                    )}
                 </div>
             )}
         </div>
@@ -60,7 +129,7 @@ function BtnAcciones({ despacho, onVerDetalle }) {
 }
 
 /* ── Componente principal ─────────────────────────────────── */
-export default function ListaDespachos({ onNuevoDespacho, onVerDetalle }) {
+export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo }) {
     const [despachos, setDespachos]           = useState([]);
     const [loading, setLoading]               = useState(true);
     const [busqueda, setBusqueda]             = useState('');
@@ -242,7 +311,16 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle }) {
                                         <EstadoBadge estado={d.estado} />
                                     </td>
                                     <td className="px-5 py-4 text-center">
-                                        <BtnAcciones despacho={d} onVerDetalle={onVerDetalle} />
+                                        <BtnAcciones
+                                            despacho={d}
+                                            esCliente={esCliente}
+                                            onVerDetalle={onVerDetalle}
+                                            onVerTributos={onVerTributos}
+                                            onAdjuntarComprobantes={onAdjuntarComprobantes}
+                                            onValidarComprobantes={onValidarComprobantes}
+                                            onRegistrarNumeracion={onRegistrarNumeracion}
+                                            onObservacionesAforo={onObservacionesAforo}
+                                        />
                                     </td>
                                 </tr>
                             ))}

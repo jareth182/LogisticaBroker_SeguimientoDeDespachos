@@ -25,11 +25,11 @@ export default function AdjuntarDocumentosLegales({ onAvanzarFirma }) {
     const validarArchivo = (f) => {
         const ext = f.name.split('.').pop().toLowerCase();
         if (!['pdf', 'xml'].includes(ext)) {
-            setErrorArchivo('Formato no válido. Solo se aceptan PDF o XML.');
+            setErrorArchivo('El formato del archivo no es válido. Solo se aceptan PDF y XML.');
             return false;
         }
         if (f.size > MAX_SIZE) {
-            setErrorArchivo('El archivo supera el límite de 15 MB.');
+            setErrorArchivo('El archivo supera el tamaño máximo permitido de 15 MB.');
             return false;
         }
         setErrorArchivo('');
@@ -54,13 +54,17 @@ export default function AdjuntarDocumentosLegales({ onAvanzarFirma }) {
     const handleDragLeave = () => setArrastrando(false);
 
     const handleSubir = () => {
-        if (!archivoPendiente) return;
+        if (!archivoPendiente) {
+            setErrorArchivo('Debes seleccionar un archivo antes de continuar.');
+            return;
+        }
         const fakeUrl = `https://storage.fake/docs/${Date.now()}_${archivoPendiente.name}`;
         setDocumentosCargados(prev => ({
             ...prev,
             [tipoSeleccionado]: { nombre: archivoPendiente.name, url: fakeUrl, tamanio: formatBytes(archivoPendiente.size) },
         }));
         setArchivoPendiente(null);
+        setErrorArchivo('');
         if (inputRef.current) inputRef.current.value = '';
     };
 
@@ -192,7 +196,7 @@ export default function AdjuntarDocumentosLegales({ onAvanzarFirma }) {
                                 >
                                     Explorar archivos
                                 </button>
-                                <p className="text-xs text-gray-400 mt-3">Formatos soportados: .PDF, .XML</p>
+                                <p className="text-xs text-gray-400 mt-3">Formatos soportados: .PDF, .XML · Máximo 15 MB</p>
                             </>
                         )}
                     </div>
@@ -214,10 +218,7 @@ export default function AdjuntarDocumentosLegales({ onAvanzarFirma }) {
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={handleSubir}
-                                disabled={!archivoPendiente}
-                                className={`px-5 py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg transition-colors ${
-                                    archivoPendiente ? 'hover:bg-[#243050]' : 'opacity-50 cursor-not-allowed'
-                                }`}
+                                className="px-5 py-2.5 bg-[#1a2540] hover:bg-[#243050] text-white text-sm font-semibold rounded-lg transition-colors"
                             >
                                 Subir Documentos
                             </button>
