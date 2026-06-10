@@ -38,7 +38,7 @@ public class AuthService
 
         // 3. Verificar que el usuario esté activo
         if (usuario.Estado != "Activo")
-            throw new UnauthorizedAccessException("Tu cuenta está inactiva. Contacta al administrador");
+            throw new UnauthorizedAccessException("Tu cuenta no tiene acceso al sistema");
 
         // 4. Generar token JWT
         var token = GenerarToken(usuario.IdUsuario, usuario.Correo, usuario.Rol.NombreRol);

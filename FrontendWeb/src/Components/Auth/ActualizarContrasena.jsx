@@ -20,6 +20,11 @@ export default function ActualizarContrasena({ onActualizado }) {
             setError('Las contraseñas no coinciden.');
             return;
         }
+        const seguridadOk = /[A-Z]/.test(nuevaContrasena) && /[0-9]/.test(nuevaContrasena) && /[^A-Za-z0-9]/.test(nuevaContrasena);
+        if (!seguridadOk) {
+            setError('La contraseña debe tener mínimo una mayúscula, un número y un carácter especial');
+            return;
+        }
         setError('');
         setLoading(true);
         try {

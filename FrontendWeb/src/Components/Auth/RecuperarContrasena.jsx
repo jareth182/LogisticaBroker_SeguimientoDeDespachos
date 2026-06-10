@@ -31,6 +31,15 @@ export default function RecuperarContrasena({ onVolver }) {
     const handleEnviar = async (e) => {
         e.preventDefault();
         setError('');
+        if (!correo.trim()) {
+            setError('El correo electrónico es obligatorio');
+            return;
+        }
+        const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim());
+        if (!emailValido) {
+            setError('Ingresa un correo electrónico válido');
+            return;
+        }
         setLoading(true);
         try {
             const response = await fetch(`${API_BASE_URL}/recuperar-contrasena`, {
@@ -55,6 +64,10 @@ export default function RecuperarContrasena({ onVolver }) {
         e.preventDefault();
         if (nuevaContrasena !== confirmar) {
             setError('Las contraseñas no coinciden.');
+            return;
+        }
+        if (nuevaContrasena.length < 8) {
+            setError('La contraseña debe tener mínimo 8 caracteres alfanuméricos');
             return;
         }
         setError('');

@@ -18,9 +18,19 @@ import ExtraerDatosFactura from './Components/Despachos/ExtraerDatosFactura';
 import EditarDetalleMercancia from './Components/Despachos/EditarDetalleMercancia';
 import BorradorDAMFinal from './Components/Despachos/BorradorDAMFinal';
 
+function tokenEstaExpirado(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp * 1000 < Date.now();
+  } catch {
+    return true;
+  }
+}
+
 export default function App() {
   const [usuario, setUsuario]                         = useState(null);
   const [pantallaAuth, setPantallaAuth]               = useState('login');
+  const [mensajeAuth, setMensajeAuth]                 = useState('');
   const [requiereCambioContrasena, setRequiereCambio] = useState(false);
   const [view, setView]                               = useState('despachos');
   const [despachoActivo, setDespachoActivo] = useState(null);
@@ -40,6 +50,12 @@ export default function App() {
     const token    = localStorage.getItem('token');
     const userData = localStorage.getItem('usuario');
     if (token && userData) {
+      if (tokenEstaExpirado(token)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        setMensajeAuth('Sesión expirada. Vuelve a iniciar sesión');
+        return;
+      }
       const parsedUser = JSON.parse(userData);
       setUsuario(parsedUser);
       if (parsedUser.requiereCambioContrasena) {
@@ -104,7 +120,7 @@ export default function App() {
   if (!usuario) {
     if (pantallaAuth === 'recuperar')
       return <RecuperarContrasena onVolver={() => setPantallaAuth('login')} />;
-    return <Login onLoginExitoso={handleLoginExitoso} onIrRecuperar={() => setPantallaAuth('recuperar')} />;
+    return <Login onLoginExitoso={handleLoginExitoso} onIrRecuperar={() => setPantallaAuth('recuperar')} mensajeInicial={mensajeAuth} />;
   }
 
   if (requiereCambioContrasena) {
@@ -159,7 +175,7 @@ export default function App() {
           />
           <NavItem
             icon="M12 4v16m8-8H4"
-            text="+ Nuevo Despacho"
+            text="Nuevo Despacho"
             onClick={() => setView('nuevo-despacho')}
             collapsed={isCollapsed}
             active={view === 'nuevo-despacho'}

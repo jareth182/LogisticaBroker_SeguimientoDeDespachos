@@ -1,16 +1,22 @@
 import { useState } from 'react';
 
-export default function Login({ onLoginExitoso, onIrRecuperar }) {
+export default function Login({ onLoginExitoso, onIrRecuperar, mensajeInicial = '' }) {
     const [correo, setCorreo]         = useState('');
     const [contrasena, setContrasena] = useState('');
     const [loading, setLoading]       = useState(false);
-    const [error, setError]           = useState('');
+    const [error, setError]           = useState(mensajeInicial);
 
     const API_BASE_URL = 'http://localhost:5018/api/Auth';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
+        if (!correo.trim() || !contrasena.trim()) {
+            setError('Todos los campos son obligatorios');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -27,7 +33,7 @@ export default function Login({ onLoginExitoso, onIrRecuperar }) {
                 localStorage.setItem('usuario', JSON.stringify(data.usuario));
                 onLoginExitoso(data.usuario);
             } else {
-                setError(data.mensaje || 'Credenciales inválidas. Verifica tu correo y contraseña.');
+                setError(data.mensaje || 'Correo o contraseña incorrectos');
             }
         } catch {
             setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo.');
