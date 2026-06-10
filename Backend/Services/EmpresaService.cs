@@ -35,11 +35,19 @@ public class EmpresaService
             Correo         = empresa.Correo,
             ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(password),
             IdEmpresa      = empresa.IdEmpresa,
-            IdRol          = 1,
+            IdRol          = 2,
             Estado         = "Activo"
         };
 
         _context.Usuarios.Add(usuario);
+        await _context.SaveChangesAsync();
+
+        _context.ContratosServicio.Add(new ContratoServicio
+        {
+            IdEmpresa       = empresa.IdEmpresa,
+            EstadoFirma     = "Pendiente",
+            FechaGeneracion = DateTime.UtcNow,
+        });
         await _context.SaveChangesAsync();
 
         _context.Auditorias.Add(new Auditoria

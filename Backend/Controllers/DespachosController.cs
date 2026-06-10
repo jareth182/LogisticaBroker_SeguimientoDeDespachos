@@ -28,13 +28,17 @@ namespace LogisticaBroker.Controllers
 
         // T30: Desarrollar endpoint GET para listar clientes afiliados activos
         [HttpGet("clientes/buscar")]
-        public async Task<ActionResult<IEnumerable<EmpresaBusquedaDto>>> BuscarClientes([FromQuery] string termino)
+        public async Task<ActionResult<IEnumerable<EmpresaBusquedaDto>>> BuscarClientes(
+            [FromQuery] string termino,
+            [FromQuery] bool soloFirmados = false)
         {
-            if (string.IsNullOrWhiteSpace(termino)) 
+            if (string.IsNullOrWhiteSpace(termino))
                 return BadRequest(new { mensaje = "El término de búsqueda es requerido." });
 
-            var empresas = await _empresaRepository.BuscarPorRucORazonSocialAsync(termino);
-            
+            var empresas = soloFirmados
+                ? await _empresaRepository.BuscarConContratoFirmadoAsync(termino)
+                : await _empresaRepository.BuscarPorRucORazonSocialAsync(termino);
+
             var resultado = empresas.Select(e => new EmpresaBusquedaDto
             {
                 IdEmpresa = e.IdEmpresa,

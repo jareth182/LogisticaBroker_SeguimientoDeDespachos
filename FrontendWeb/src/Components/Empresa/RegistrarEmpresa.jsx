@@ -3,43 +3,32 @@ import { useState } from 'react';
 const API = 'http://localhost:5018/api/Empresa/registrar';
 
 export default function RegistrarEmpresa({ onVolver }) {
-    const [ruc, setRuc]             = useState('');
-    const [razonSocial, setRazonSocial] = useState('');
-    const [correo, setCorreo]       = useState('');
-    const [telefono, setTelefono]   = useState('');
+    const [ruc, setRuc]                           = useState('');
+    const [razonSocial, setRazonSocial]           = useState('');
+    const [personaContacto, setPersonaContacto]   = useState('');
+    const [correo, setCorreo]                     = useState('');
+    const [telefono, setTelefono]                 = useState('');
+    const [direccionFiscal, setDireccionFiscal]   = useState('');
 
-    const [errores, setErrores]     = useState({});
-    const [loading, setLoading]     = useState(false);
-    const [errorApi, setErrorApi]   = useState('');
+    const [errores, setErrores]   = useState({});
+    const [loading, setLoading]   = useState(false);
+    const [errorApi, setErrorApi] = useState('');
     const [resultado, setResultado] = useState(null);
-    const [toast, setToast]         = useState(false);
-    const [validandoRuc, setValidandoRuc] = useState(false);
 
-    // ── Validación ────────────────────────────────────────────
     const validar = () => {
         const e = {};
         if (!ruc.trim())                        e.ruc = 'El RUC es obligatorio';
         else if (!/^\d{11}$/.test(ruc.trim()))  e.ruc = 'El RUC debe tener 11 dígitos';
         if (!razonSocial.trim())                e.razonSocial = 'La razón social es obligatoria';
+        if (!personaContacto.trim())            e.personaContacto = 'La persona de contacto es obligatoria';
         if (!correo.trim())                     e.correo = 'El correo es obligatorio';
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) e.correo = 'Formato de correo inválido';
+        if (!telefono.trim())                   e.telefono = 'El teléfono de contacto es obligatorio';
+        if (!direccionFiscal.trim())            e.direccionFiscal = 'La dirección fiscal es obligatoria';
         setErrores(e);
         return Object.keys(e).length === 0;
     };
 
-    // ── Validar SUNAT (placeholder) ───────────────────────────
-    const handleValidarSunat = async () => {
-        if (!ruc.trim() || !/^\d{11}$/.test(ruc.trim())) {
-            setErrores(prev => ({ ...prev, ruc: 'Ingresa un RUC de 11 dígitos para validar' }));
-            return;
-        }
-        setValidandoRuc(true);
-        await new Promise(r => setTimeout(r, 800));
-        setValidandoRuc(false);
-        setErrores(prev => { const copy = { ...prev }; delete copy.ruc; return copy; });
-    };
-
-    // ── Submit ────────────────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!validar()) return;
@@ -54,16 +43,20 @@ export default function RegistrarEmpresa({ onVolver }) {
                 body: JSON.stringify({
                     ruc:            ruc.trim(),
                     razonSocial:    razonSocial.trim(),
-                    nombreContacto: razonSocial.trim(),
+                    nombreContacto: personaContacto.trim(),
                     correo:         correo.trim(),
-                    celular:        telefono.trim() || null,
+                    celular:        telefono.trim(),
+                    direccionFiscal: direccionFiscal.trim(),
                 })
             });
             const data = await res.json();
             if (res.ok) {
-                setResultado(data);
-                setToast(true);
-                setTimeout(() => setToast(false), 5000);
+                setResultado({
+                    ...data,
+                    personaContacto: personaContacto.trim(),
+                    telefono:        telefono.trim(),
+                    direccionFiscal: direccionFiscal.trim(),
+                });
             } else {
                 setErrorApi(data.error || data.mensaje || 'Error al registrar el cliente.');
             }
@@ -74,17 +67,9 @@ export default function RegistrarEmpresa({ onVolver }) {
         }
     };
 
-    // ── Pantalla de éxito ─────────────────────────────────────
     if (resultado) {
         return (
             <div className="max-w-2xl mx-auto">
-                {/* Breadcrumb */}
-                <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
-                    <button onClick={onVolver} className="hover:text-gray-700 transition-colors">Administración</button>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                    <span className="text-gray-700 font-medium">Nuevo Cliente</span>
-                </div>
-
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-center">
                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,27 +84,22 @@ export default function RegistrarEmpresa({ onVolver }) {
                     <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 mb-6 text-sm">
                         <div className="flex justify-between"><span className="text-gray-500">RUC</span><span className="font-semibold font-mono">{resultado.ruc}</span></div>
                         <div className="flex justify-between"><span className="text-gray-500">Razón Social</span><span className="font-semibold">{resultado.razonSocial}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-500">Usuario generado</span><span className="font-mono font-semibold">{resultado.usuarioGenerado}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Persona de contacto</span><span className="font-semibold">{resultado.personaContacto}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Correo</span><span className="font-semibold">{resultado.correo}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Teléfono de contacto</span><span className="font-semibold">{resultado.telefono}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">Dirección Fiscal</span><span className="font-semibold">{resultado.direccionFiscal}</span></div>
                         <div className="flex justify-between items-center">
                             <span className="text-gray-500">Estado</span>
                             <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">Pendiente de formalización</span>
                         </div>
                     </div>
 
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => { setResultado(null); setRuc(''); setRazonSocial(''); setCorreo(''); setTelefono(''); }}
-                            className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            Registrar otro cliente
-                        </button>
-                        <button
-                            onClick={onVolver}
-                            className="flex-1 py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#243050] transition-colors"
-                        >
-                            Ver directorio de clientes
-                        </button>
-                    </div>
+                    <button
+                        onClick={onVolver}
+                        className="w-full py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#243050] transition-colors"
+                    >
+                        VER CLIENTES
+                    </button>
                 </div>
             </div>
         );
@@ -128,16 +108,6 @@ export default function RegistrarEmpresa({ onVolver }) {
     return (
         <div className="max-w-2xl mx-auto">
 
-            {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
-                <button onClick={onVolver} className="hover:text-gray-700 transition-colors">Administración</button>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="text-gray-700 font-medium">Nuevo Cliente</span>
-            </div>
-
-            {/* Título */}
             <div className="flex items-center gap-3 mb-1">
                 <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                     <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,48 +120,33 @@ export default function RegistrarEmpresa({ onVolver }) {
                 Ingresa los datos fiscales y de contacto para dar de alta a un nuevo cliente en el sistema.
             </p>
 
-            {/* Formulario */}
             <form onSubmit={handleSubmit}>
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-6">
 
-                    {/* ── Sección: Datos Fiscales ── */}
+                    {/* ── Datos Fiscales ── */}
                     <div>
                         <h2 className="text-base font-bold text-gray-800 mb-4">Datos Fiscales</h2>
 
-                        {/* RUC */}
                         <div className="mb-4">
                             <label className="block text-sm font-semibold text-gray-700 mb-1">
                                 RUC <span className="text-red-500">*</span>
                             </label>
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <input
-                                        type="text"
-                                        value={ruc}
-                                        onChange={e => setRuc(e.target.value.replace(/\D/g,'').slice(0,11))}
-                                        placeholder="1845... o 205..."
-                                        maxLength={11}
-                                        className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${
-                                            errores.ruc
-                                                ? 'border-red-300 bg-red-50 focus:ring-2 focus:ring-red-100'
-                                                : 'border-gray-200 focus:ring-2 focus:ring-blue-200 focus:border-blue-400'
-                                        }`}
-                                    />
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={handleValidarSunat}
-                                    disabled={validandoRuc}
-                                    className="px-4 py-2.5 text-sm font-semibold text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-60 whitespace-nowrap"
-                                >
-                                    {validandoRuc ? 'Validando...' : 'Validar SUNAT'}
-                                </button>
-                            </div>
+                            <input
+                                type="text"
+                                value={ruc}
+                                onChange={e => setRuc(e.target.value.replace(/\D/g,'').slice(0,11))}
+                                placeholder="1845... o 205..."
+                                maxLength={11}
+                                className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${
+                                    errores.ruc
+                                        ? 'border-red-300 bg-red-50 focus:ring-2 focus:ring-red-100'
+                                        : 'border-gray-200 focus:ring-2 focus:ring-blue-200 focus:border-blue-400'
+                                }`}
+                            />
                             {errores.ruc && <p className="text-xs text-red-500 mt-1">{errores.ruc}</p>}
                         </div>
 
-                        {/* Razón Social */}
-                        <div>
+                        <div className="mb-4">
                             <label className="block text-sm font-semibold text-gray-700 mb-1">
                                 Razón Social <span className="text-red-500">*</span>
                             </label>
@@ -208,16 +163,51 @@ export default function RegistrarEmpresa({ onVolver }) {
                             />
                             {errores.razonSocial && <p className="text-xs text-red-500 mt-1">{errores.razonSocial}</p>}
                         </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                Dirección Fiscal <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={direccionFiscal}
+                                onChange={e => setDireccionFiscal(e.target.value)}
+                                placeholder="Av. Principal 123, Lima"
+                                className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${
+                                    errores.direccionFiscal
+                                        ? 'border-red-300 bg-red-50 focus:ring-2 focus:ring-red-100'
+                                        : 'border-gray-200 focus:ring-2 focus:ring-blue-200 focus:border-blue-400'
+                                }`}
+                            />
+                            {errores.direccionFiscal && <p className="text-xs text-red-500 mt-1">{errores.direccionFiscal}</p>}
+                        </div>
                     </div>
 
-                    {/* ── Sección: Contacto Principal ── */}
+                    {/* ── Contacto Principal ── */}
                     <div>
                         <h2 className="text-base font-bold text-gray-800 mb-4">Contacto Principal</h2>
 
-                        {/* Correo Electrónico */}
                         <div className="mb-4">
                             <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                Correo Electrónico <span className="text-red-500">*</span>
+                                Persona de contacto <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={personaContacto}
+                                onChange={e => setPersonaContacto(e.target.value)}
+                                placeholder="Nombre del representante"
+                                className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${
+                                    errores.personaContacto
+                                        ? 'border-red-300 bg-red-50 focus:ring-2 focus:ring-red-100'
+                                        : 'border-gray-200 focus:ring-2 focus:ring-blue-200 focus:border-blue-400'
+                                }`}
+                            />
+                            {errores.personaContacto && <p className="text-xs text-red-500 mt-1">{errores.personaContacto}</p>}
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                Correo electrónico <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -240,9 +230,10 @@ export default function RegistrarEmpresa({ onVolver }) {
                             {errores.correo && <p className="text-xs text-red-500 mt-1">{errores.correo}</p>}
                         </div>
 
-                        {/* Teléfono */}
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1">Teléfono</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                Teléfono de contacto <span className="text-red-500">*</span>
+                            </label>
                             <div className="relative">
                                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,28 +245,24 @@ export default function RegistrarEmpresa({ onVolver }) {
                                     value={telefono}
                                     onChange={e => setTelefono(e.target.value)}
                                     placeholder="+519..."
-                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
+                                    className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${
+                                        errores.telefono
+                                            ? 'border-red-300 bg-red-50 focus:ring-2 focus:ring-red-100'
+                                            : 'border-gray-200 focus:ring-2 focus:ring-blue-200 focus:border-blue-400'
+                                    }`}
                                 />
                             </div>
+                            {errores.telefono && <p className="text-xs text-red-500 mt-1">{errores.telefono}</p>}
                         </div>
                     </div>
 
-                    {/* Error API */}
                     {errorApi && (
                         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                             {errorApi}
                         </div>
                     )}
 
-                    {/* ── Acciones ── */}
-                    <div className="flex items-center justify-end gap-4 pt-2 border-t border-gray-100">
-                        <button
-                            type="button"
-                            onClick={onVolver}
-                            className="text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors"
-                        >
-                            Cancelar
-                        </button>
+                    <div className="flex items-center justify-end pt-2 border-t border-gray-100">
                         <button
                             type="submit"
                             disabled={loading}
@@ -294,33 +281,13 @@ export default function RegistrarEmpresa({ onVolver }) {
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
-                                    REGISTRAR CLIENTE
+                                    CREAR CLIENTE
                                 </>
                             )}
                         </button>
                     </div>
                 </div>
             </form>
-
-            {/* Toast */}
-            {toast && (
-                <div className="fixed bottom-6 right-6 bg-white border border-green-100 rounded-xl shadow-xl p-4 flex items-start gap-3 z-50 min-w-[300px]">
-                    <div className="bg-green-100 p-1.5 rounded-full text-green-600 shrink-0">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <div className="flex-1">
-                        <p className="text-sm font-bold text-gray-900">Cliente registrado</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Credenciales enviadas a {resultado?.correo}</p>
-                    </div>
-                    <button onClick={() => setToast(false)} className="text-gray-400 hover:text-gray-600">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-            )}
         </div>
     );
 }

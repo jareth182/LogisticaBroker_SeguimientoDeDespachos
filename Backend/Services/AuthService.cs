@@ -49,12 +49,13 @@ public class AuthService
             Expiracion = DateTime.UtcNow.AddHours(8),
             Usuario = new UsuarioInfoDto
             {
-                IdUsuario      = usuario.IdUsuario,
-                NombreCompleto = usuario.NombreCompleto,
-                Correo         = usuario.Correo,
-                Rol            = usuario.Rol.NombreRol,
-                IdEmpresa      = usuario.IdEmpresa,
-                EstadoEmpresa  = usuario.Empresa?.Estado
+                IdUsuario               = usuario.IdUsuario,
+                NombreCompleto          = usuario.NombreCompleto,
+                Correo                  = usuario.Correo,
+                Rol                     = usuario.Rol.NombreRol,
+                IdEmpresa               = usuario.IdEmpresa,
+                EstadoEmpresa           = usuario.Empresa?.Estado,
+                RequiereCambioContrasena = usuario.DebeActualizarContrasena
             }
         };
     }
@@ -70,11 +71,49 @@ public class AuthService
         // Siempre respondemos igual para no revelar si el correo existe
         if (usuario is null) return;
 
-        var token   = Guid.NewGuid().ToString("N")[..12].ToUpper();
-        var asunto  = "Recuperación de contraseña — Logística Broker";
-        var html    = _emailService.GenerarPlantillaRecuperacion(usuario.NombreCompleto, usuario.Correo, token);
+        // Generar token único y guardarlo en BD con expiración de 30 minutos
+        var token = Guid.NewGuid().ToString("N");
+        usuario.TokenRecuperacion  = token;
+        usuario.TokenExpiracionUtc = DateTime.UtcNow.AddMinutes(30);
+        await _context.SaveChangesAsync();
+
+        var asunto = "Recuperación de contraseña — Logística Broker";
+        var html   = _emailService.GenerarPlantillaRecuperacion(usuario.NombreCompleto, usuario.Correo, token);
 
         await _emailService.EnviarCorreoAsync(usuario.Correo, asunto, html);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // HU — Cambiar contraseña con token
+    // ─────────────────────────────────────────────────────────
+    public async Task CambiarContrasenaAsync(CambiarContrasenaDto dto)
+    {
+        var usuario = await _context.Usuarios
+            .FirstOrDefaultAsync(u => u.TokenRecuperacion == dto.Token);
+
+        if (usuario is null)
+            throw new InvalidOperationException("El token no es válido.");
+
+        if (usuario.TokenExpiracionUtc < DateTime.UtcNow)
+            throw new InvalidOperationException("El token ha expirado. Solicita una nueva recuperación.");
+
+        usuario.ContrasenaHash      = BCrypt.Net.BCrypt.HashPassword(dto.NuevaContrasena);
+        usuario.TokenRecuperacion   = null;
+        usuario.TokenExpiracionUtc  = null;
+        await _context.SaveChangesAsync();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Actualizar contraseña en primer login (post-firma contrato)
+    // ─────────────────────────────────────────────────────────
+    public async Task ActualizarContrasenaAsync(int idUsuario, string nuevaContrasena)
+    {
+        var usuario = await _context.Usuarios.FindAsync(idUsuario)
+            ?? throw new InvalidOperationException("Usuario no encontrado.");
+
+        usuario.ContrasenaHash           = BCrypt.Net.BCrypt.HashPassword(nuevaContrasena);
+        usuario.DebeActualizarContrasena = false;
+        await _context.SaveChangesAsync();
     }
 
     // ─────────────────────────────────────────────────────────

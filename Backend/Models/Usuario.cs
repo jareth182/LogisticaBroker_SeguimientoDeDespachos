@@ -10,6 +10,9 @@ public class Usuario
     public string ContrasenaHash { get; set; } = null!;
     public string Estado { get; set; } = "Activo";
     public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+    public string? TokenRecuperacion { get; set; }
+    public DateTime? TokenExpiracionUtc { get; set; }
+    public bool DebeActualizarContrasena { get; set; } = true;
 
     // Navegación
     public Rol Rol { get; set; } = null!;

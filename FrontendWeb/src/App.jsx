@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Login from './Components/Auth/Login';
 import RecuperarContrasena from './Components/Auth/RecuperarContrasena';
+import ActualizarContrasena from './Components/Auth/ActualizarContrasena';
 import DetalleDespacho from './Components/Despachos/DetalleDespacho';
 import RegistrarEmpresa from './Components/Empresa/RegistrarEmpresa';
 import FirmaContrato from './Components/Contratos/FirmaContrato';
@@ -18,9 +19,10 @@ import EditarDetalleMercancia from './Components/Despachos/EditarDetalleMercanci
 import BorradorDAMFinal from './Components/Despachos/BorradorDAMFinal';
 
 export default function App() {
-  const [usuario, setUsuario]           = useState(null);
-  const [pantallaAuth, setPantallaAuth] = useState('login');
-  const [view, setView]                 = useState('despachos');
+  const [usuario, setUsuario]                         = useState(null);
+  const [pantallaAuth, setPantallaAuth]               = useState('login');
+  const [requiereCambioContrasena, setRequiereCambio] = useState(false);
+  const [view, setView]                               = useState('despachos');
   const [despachoActivo, setDespachoActivo] = useState(null);
   const [liquidacionDespacho, setLiquidacionDespacho] = useState(null);
   const [clasificacionDespacho, setClasificacionDespacho] = useState(null);
@@ -30,12 +32,19 @@ export default function App() {
   });
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token')) {
+      setPantallaAuth('recuperar');
+      return;
+    }
     const token    = localStorage.getItem('token');
     const userData = localStorage.getItem('usuario');
     if (token && userData) {
       const parsedUser = JSON.parse(userData);
       setUsuario(parsedUser);
-      if (parsedUser.rol === 'Cliente') {
+      if (parsedUser.requiereCambioContrasena) {
+        setRequiereCambio(true);
+      } else if (parsedUser.rol === 'Cliente') {
         setView(parsedUser.estadoEmpresa === 'Pendiente' ? 'firma-contrato' : 'trazabilidad');
       }
     }
@@ -43,8 +52,24 @@ export default function App() {
 
   const handleLoginExitoso = (usuarioData) => {
     setUsuario(usuarioData);
+    if (usuarioData.requiereCambioContrasena) {
+      setRequiereCambio(true);
+      return;
+    }
     if (usuarioData.rol === 'Cliente') {
       setView(usuarioData.estadoEmpresa === 'Pendiente' ? 'firma-contrato' : 'trazabilidad');
+    } else {
+      setView('despachos');
+    }
+  };
+
+  const handleContrasenaActualizada = () => {
+    setRequiereCambio(false);
+    const updatedUser = { ...usuario, requiereCambioContrasena: false };
+    setUsuario(updatedUser);
+    localStorage.setItem('usuario', JSON.stringify(updatedUser));
+    if (updatedUser.rol === 'Cliente') {
+      setView(updatedUser.estadoEmpresa === 'Pendiente' ? 'firma-contrato' : 'trazabilidad');
     } else {
       setView('despachos');
     }
@@ -82,6 +107,10 @@ export default function App() {
     return <Login onLoginExitoso={handleLoginExitoso} onIrRecuperar={() => setPantallaAuth('recuperar')} />;
   }
 
+  if (requiereCambioContrasena) {
+    return <ActualizarContrasena onActualizado={handleContrasenaActualizada} />;
+  }
+
   const iniciales = usuario.nombreCompleto
     ?.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || 'U';
 
@@ -111,26 +140,16 @@ export default function App() {
 
           {/* ── NAV CLIENTE ── */}
           {usuario?.rol === 'Cliente' ? (<>
-            <NavItem icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" text="Panel de Trazabilidad" onClick={() => setView('trazabilidad')} collapsed={isCollapsed} active={view === 'trazabilidad'} />
-            <NavItem icon="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" text="Documentación" onClick={() => setView('documentacion')} collapsed={isCollapsed} active={view === 'documentacion'} />
-            <NavItem icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" text="Firmar Contrato" onClick={() => setView('firma-contrato')} collapsed={isCollapsed} active={view === 'firma-contrato'} />
-            <NavItem icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" text="Mis Documentos" onClick={() => setView('documentos')} collapsed={isCollapsed} active={view === 'documentos'} />
+            {usuario.estadoEmpresa === 'Afiliado Activo' ? (<>
+              <NavItem icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" text="Panel de Trazabilidad" onClick={() => setView('trazabilidad')} collapsed={isCollapsed} active={view === 'trazabilidad'} />
+              <NavItem icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" text="Mis Documentos" onClick={() => setView('documentos')} collapsed={isCollapsed} active={view === 'documentos'} />
+            </>) : (<>
+              <NavItem icon="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" text="Documentación" onClick={() => setView('documentacion')} collapsed={isCollapsed} active={view === 'documentacion'} />
+              <NavItem icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" text="Firmar Contrato" onClick={() => setView('firma-contrato')} collapsed={isCollapsed} active={view === 'firma-contrato'} />
+            </>)}
           </>) : (<>
 
           {/* ── NAV ADMIN / OPERATIVO ── */}
-          <NavItem icon="M12 4v16m8-8H4" text="Crear Despacho" onClick={() => setView('crear')} collapsed={isCollapsed} active={view === 'crear'} />
-          <NavItem icon="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" text="Repositorio de Despacho" onClick={() => setView('lista')} collapsed={isCollapsed} active={view === 'lista' || view === 'detalle'} />
-          <NavItem icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" text="Panel de Trazabilidad" onClick={() => setView('trazabilidad')} collapsed={isCollapsed} active={view === 'trazabilidad'} />
-
-          {!isCollapsed && (
-            <div className="px-6 py-2">
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Contratos</div>
-            </div>
-          )}
-
-          <NavItem icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" text="Firmar Contrato" onClick={() => setView('firma-contrato')} collapsed={isCollapsed} active={view === 'firma-contrato'} />
-          <NavItem icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" text="Mis Documentos" onClick={() => setView('documentos')} collapsed={isCollapsed} active={view === 'documentos'} />
-
           <NavItem
             icon="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
             text="Despachos"
@@ -139,11 +158,11 @@ export default function App() {
             active={view === 'despachos' || view === 'nuevo-despacho' || view === 'detalle' || view === 'clasificacion' || view === 'liquidaciones'}
           />
           <NavItem
-            icon="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-            text="Administración"
-            onClick={() => setView('clientes')}
+            icon="M12 4v16m8-8H4"
+            text="+ Nuevo Despacho"
+            onClick={() => setView('nuevo-despacho')}
             collapsed={isCollapsed}
-            active={view === 'clientes' || view === 'nuevo-cliente'}
+            active={view === 'nuevo-despacho'}
           />
           <NavItem
             icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"
@@ -152,25 +171,26 @@ export default function App() {
             collapsed={isCollapsed}
             active={view === 'trazabilidad'}
           />
+
+          {!isCollapsed && (
+            <div className="px-6 py-2 mt-1">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Clientes</div>
+            </div>
+          )}
           <NavItem
-            icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            text="Firmar Contrato"
-            onClick={() => setView('firma-contrato')}
+            icon="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+            text="Administración"
+            onClick={() => setView('clientes')}
             collapsed={isCollapsed}
-            active={view === 'firma-contrato'}
+            active={view === 'clientes' || view === 'nuevo-cliente'}
           />
+
           <NavItem
             icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
             text="Mis Documentos"
             onClick={() => setView('documentos')}
             collapsed={isCollapsed}
             active={view === 'documentos'}
-          />
-          <NavItem
-            icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-            text="Configuración"
-            collapsed={isCollapsed}
-            active={false}
           />
           </>)}
         </nav>
@@ -241,11 +261,6 @@ export default function App() {
               <ListaDespachos
                   onVerDetalle={handleVerDetalle}
                   onNuevoDespacho={() => setView('nuevo-despacho')}
-                  onVerLiquidaciones={(d) => { setLiquidacionDespacho(d); setView('liquidaciones'); }}
-                  onClasificacion={(d) => { setClasificacionDespacho(d); setView('clasificacion'); }}
-                  onDocumentacion={(d) => { setDespachoActivo(d); setView('documentacion-logistica'); }}
-                  onExtraerFactura={(d) => { setDespachoActivo(d); setView('extraer-factura'); }}
-                  onBorradorDAM={(d) => { setDespachoActivo(d); setView('borrador-dam-final'); }}
               />
           )}
 
@@ -272,7 +287,7 @@ export default function App() {
                 setUsuario(updatedUser);
                 setView('trazabilidad');
               }}
-              onCancelar={() => setView('trazabilidad')}
+              onCancelar={() => setView(usuario?.estadoEmpresa === 'Pendiente' ? 'documentacion' : 'trazabilidad')}
             />
           )}
 
@@ -355,15 +370,6 @@ export default function App() {
             <RegistrarEmpresa onVolver={() => setView('clientes')} />
           )}
 
-          {/* ── Trazabilidad (placeholder) ── */}
-          {view === 'trazabilidad' && (
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-6">Panel de Trazabilidad</h1>
-              <div className="bg-white border border-gray-200 rounded-xl p-12 text-center text-gray-400 text-sm shadow-sm">
-                Panel de trazabilidad — próximamente
-              </div>
-            </div>
-          )}
         </div>
       </main>
     </div>

@@ -17,8 +17,9 @@ export default function Documentos({ onNavigate }) {
         setLoading(true);
         try {
             // Obtener idEmpresa del usuario logueado
-            const userData = localStorage.getItem('user');
-            const idEmpresa = userData ? JSON.parse(userData).idEmpresa : 1;
+            const userData = localStorage.getItem('usuario');
+            const idEmpresa = userData ? JSON.parse(userData).idEmpresa : null;
+            if (!idEmpresa) { setDocumentos([]); setLoading(false); return; }
 
             const response = await fetch(`${API_BASE_URL}/contrato/empresa/${idEmpresa}`);
             if (response.ok) {

@@ -27,6 +27,7 @@ public class UsuarioInfoDto
     public string Rol { get; set; } = null!;
     public int? IdEmpresa { get; set; }
     public string? EstadoEmpresa { get; set; }
+    public bool RequiereCambioContrasena { get; set; }
 }
 
 public class RecuperarContrasenaDto
@@ -34,4 +35,21 @@ public class RecuperarContrasenaDto
     [Required(ErrorMessage = "El correo es obligatorio")]
     [EmailAddress(ErrorMessage = "Formato de correo inválido")]
     public string Correo { get; set; } = null!;
+}
+
+public class CambiarContrasenaDto
+{
+    [Required(ErrorMessage = "El token es obligatorio")]
+    public string Token { get; set; } = null!;
+
+    [Required(ErrorMessage = "La nueva contraseña es obligatoria")]
+    [MinLength(6, ErrorMessage = "La contraseña debe tener al menos 6 caracteres")]
+    public string NuevaContrasena { get; set; } = null!;
+}
+
+public class ActualizarContrasenaDto
+{
+    [Required(ErrorMessage = "La nueva contraseña es obligatoria")]
+    [MinLength(6, ErrorMessage = "La contraseña debe tener al menos 6 caracteres")]
+    public string NuevaContrasena { get; set; } = null!;
 }

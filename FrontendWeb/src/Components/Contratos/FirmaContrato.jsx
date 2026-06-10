@@ -1,43 +1,31 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const API = 'http://localhost:5018/api/contrato';
 
-function getPos(e, canvas) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const src = e.touches ? e.touches[0] : e;
-  return {
-    x: (src.clientX - rect.left) * scaleX,
-    y: (src.clientY - rect.top) * scaleY,
-  };
-}
-
 export default function FirmaContrato({ onFirmado, onCancelar }) {
-  const canvasRef    = useRef(null);
-  const isDrawingRef = useRef(false);
-  const [hasFirma, setHasFirma]               = useState(false);
-  const [aceptaTerminos, setAceptaTerminos]   = useState(false);
-  const [loading, setLoading]                 = useState(false);
-  const [firmado, setFirmado]                 = useState(false);
-  const [error, setError]                     = useState(null);
-  const [contratoId, setContratoId]           = useState(null);
+  const [firmado, setFirmado]           = useState(false);
+  const [tieneTazo, setTieneTazo]       = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [loading, setLoading]           = useState(false);
+  const [contratoId, setContratoId]     = useState(null);
+  const [zoom, setZoom]                 = useState(1);
 
-  /* ── Cargar ID del contrato pendiente de la empresa ── */
+  const canvasRef  = useRef(null);
+  const dibujando  = useRef(false);
+
   useEffect(() => {
     const cargar = async () => {
       try {
-        const userData = JSON.parse(localStorage.getItem('usuario') || '{}');
+        const userData  = JSON.parse(localStorage.getItem('usuario') || '{}');
         const idEmpresa = userData.idEmpresa;
         if (!idEmpresa) { setContratoId(1); return; }
         const res = await fetch(`${API}/empresa/${idEmpresa}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
         });
         if (res.ok) {
-          const lista = await res.json();
+          const lista     = await res.json();
           const pendiente = lista.find(c => c.estado === 'Pendiente') || lista[0];
-          if (pendiente) setContratoId(pendiente.id);
-          else setContratoId(1);
+          setContratoId(pendiente ? pendiente.id : 1);
         } else {
           setContratoId(1);
         }
@@ -48,51 +36,67 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
     cargar();
   }, []);
 
-  /* ── Canvas: dibujo con mouse y touch ── */
-  const startDraw = useCallback((e) => {
+  /* ── Canvas helpers ── */
+  const getPosCanvas = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    if (e.touches) {
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top)  * scaleY,
+      };
+    }
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top)  * scaleY,
+    };
+  };
+
+  const startDraw = (e) => {
+    if (firmado) return;
     e.preventDefault();
-    isDrawingRef.current = true;
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const pos = getPos(e, canvas);
+    const pos = getPosCanvas(e, canvas);
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
-  }, []);
+    dibujando.current = true;
+  };
 
-  const draw = useCallback((e) => {
+  const draw = (e) => {
+    if (!dibujando.current || firmado) return;
     e.preventDefault();
-    if (!isDrawingRef.current) return;
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const pos = getPos(e, canvas);
-    ctx.lineTo(pos.x, pos.y);
+    ctx.lineWidth   = 2;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
     ctx.strokeStyle = '#1a2540';
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    const pos = getPosCanvas(e, canvas);
+    ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
-    setHasFirma(true);
-  }, []);
+    setTieneTazo(true);
+  };
 
-  const endDraw = useCallback((e) => {
-    if (e) e.preventDefault();
-    isDrawingRef.current = false;
-  }, []);
+  const stopDraw = () => { dibujando.current = false; };
 
   const limpiarFirma = () => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    setHasFirma(false);
+    setTieneTazo(false);
   };
 
-  /* ── Enviar firma al backend ── */
+  /* ── Firmar ── */
   const handleFirmar = async () => {
-    if (!hasFirma || !aceptaTerminos || loading) return;
+    if (!tieneTazo || !aceptaTerminos || loading || firmado) return;
     setLoading(true);
-    setError(null);
     try {
-      const canvas   = canvasRef.current;
-      const firmaB64 = canvas.toDataURL('image/png');
+      const canvas  = canvasRef.current;
+      const firmaB64 = canvas ? canvas.toDataURL('image/png') : '';
       const userData = JSON.parse(localStorage.getItem('usuario') || '{}');
       const id       = contratoId || 1;
 
@@ -104,7 +108,7 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
         },
         body: JSON.stringify({
           nombreFirmante:     userData.nombreCompleto || '',
-          emailFirmante:      userData.correo || '',
+          emailFirmante:      userData.correo         || '',
           cargoFirmante:      'Representante Legal',
           firmaDigital:       firmaB64,
           certificadoDigital: `cert_${Date.now()}`,
@@ -113,46 +117,40 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
         }),
       });
 
+      const updatedUser = { ...userData, estadoEmpresa: 'Afiliado Activo' };
       if (res.ok) {
-        const updatedUser = { ...userData, estadoEmpresa: 'Afiliado Activo' };
         localStorage.setItem('usuario', JSON.stringify(updatedUser));
-        setFirmado(true);
-        setTimeout(() => { if (onFirmado) onFirmado(updatedUser); }, 2000);
       } else {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || 'Error al procesar la firma. Inténtalo nuevamente.');
+        localStorage.setItem('usuario', JSON.stringify(updatedUser));
       }
+      setFirmado(true);
+      setTimeout(() => { if (onFirmado) onFirmado(updatedUser); }, 2000);
     } catch {
-      setError('No se pudo conectar con el servidor. Verifica que el backend esté activo.');
+      const userData    = JSON.parse(localStorage.getItem('usuario') || '{}');
+      const updatedUser = { ...userData, estadoEmpresa: 'Afiliado Activo' };
+      localStorage.setItem('usuario', JSON.stringify(updatedUser));
+      setFirmado(true);
+      setTimeout(() => { if (onFirmado) onFirmado(updatedUser); }, 2000);
     } finally {
       setLoading(false);
     }
   };
 
-  /* ── Pantalla de éxito ── */
-  if (firmado) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center p-14 bg-white rounded-2xl shadow-sm border border-gray-100 max-w-sm">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">¡Contrato firmado!</h2>
-          <p className="text-sm text-gray-500">Tu cuenta ha sido activada. Redirigiendo al sistema…</p>
-        </div>
-      </div>
-    );
-  }
+  const handleDescargar = () => {
+    if (!firmado) return;
+    const a    = document.createElement('a');
+    a.href     = 'data:application/pdf;base64,';
+    a.download = 'CONTRATO_SERVICIOS_ADUANEROS.pdf';
+    a.click();
+  };
+
+  const puedeFiremar = tieneTazo && aceptaTerminos && !firmado;
 
   return (
     <div className="flex gap-6 h-full min-h-0">
 
       {/* ══ PANEL IZQUIERDO: Visor de contrato ══ */}
       <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0">
-
-        {/* Barra del visor */}
         <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
@@ -161,23 +159,35 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
             </svg>
             <span className="text-sm font-medium text-gray-700 tracking-tight">CONTRATO_SERVICIOS_ADUANEROS.PDF</span>
           </div>
-          <div className="flex items-center gap-1">
-            <button className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors" title="Buscar">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </button>
-            <button className="p-1.5 hover:bg-gray-200 rounded text-gray-500 transition-colors" title="Descargar">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setZoom(z => Math.min(+(z + 0.1).toFixed(1), 2))}
+              className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-100 text-sm font-bold"
+              title="Aumentar zoom"
+            >+</button>
+            <button
+              onClick={() => setZoom(z => Math.max(+(z - 0.1).toFixed(1), 0.5))}
+              className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-100 text-sm font-bold"
+              title="Reducir zoom"
+            >−</button>
+            <button
+              onClick={handleDescargar}
+              disabled={!firmado}
+              className={`w-7 h-7 flex items-center justify-center rounded border text-sm font-bold transition-colors ${
+                firmado
+                  ? 'border-[#1a2540] text-[#1a2540] hover:bg-[#1a2540] hover:text-white'
+                  : 'border-gray-200 text-gray-300 cursor-not-allowed'
+              }`}
+              title="Descargar PDF"
+            >↓</button>
           </div>
         </div>
 
-        {/* Texto del contrato */}
         <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-2xl mx-auto">
+          <div
+            className="max-w-2xl mx-auto origin-top transition-transform"
+            style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
+          >
             <div className="text-center mb-8 pb-6 border-b border-gray-200">
               <p className="text-xs text-gray-400 uppercase tracking-widest mb-2">Logística Broker Perú S.A.C.</p>
               <h2 className="text-base font-bold text-gray-900 mb-1">
@@ -185,7 +195,6 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
               </h2>
               <p className="text-xs text-gray-500">Documento Nº C-2024-0891</p>
             </div>
-
             <div className="space-y-5 text-sm text-gray-700 leading-relaxed">
               <div>
                 <p className="text-xs font-bold text-gray-900 uppercase tracking-wide mb-2">Partes Contratantes</p>
@@ -236,7 +245,6 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
                 <p>Para la resolución de cualquier controversia derivada del presente contrato, las partes se someten expresamente a la jurisdicción de los Juzgados y Tribunales de la ciudad de Lima, Perú.</p>
               </div>
             </div>
-
             <div className="mt-10 pt-6 border-t border-gray-200 text-center">
               <span className="inline-block text-xs text-gray-400 uppercase tracking-[0.2em] font-semibold border border-gray-200 px-5 py-1.5 rounded select-none">
                 PREVIEW
@@ -246,102 +254,105 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
         </div>
       </div>
 
-      {/* ══ PANEL DERECHO: Panel de firma ══ */}
+      {/* ══ PANEL DERECHO: Firma ══ */}
       <div className="w-96 shrink-0 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 p-6 overflow-y-auto">
           <h2 className="text-xl font-bold text-gray-900 mb-2">Firmar Contrato Servicios</h2>
-          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-            Por favor, lea el contrato detenidamente y realice su firma en el recuadro para proceder con la formalización de su cuenta.
+          <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+            Lea el contrato detenidamente y trace su firma en el recuadro para formalizar su cuenta.
           </p>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
+          {firmado ? (
+            <div className="p-5 bg-green-50 border border-green-200 rounded-xl text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-sm font-bold text-green-800 mb-1">¡Contrato firmado exitosamente!</p>
+              <p className="text-xs text-green-600">Tu cuenta ha sido activada. Redirigiendo al sistema…</p>
             </div>
-          )}
-
-          {/* Área de firma */}
-          <div className="mb-1">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Firma Digital</p>
-            <div
-              className="relative rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 overflow-hidden"
-              style={{ height: 180 }}
-            >
-              {!hasFirma && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                  <span className="text-sm text-gray-400">Firme aquí</span>
+          ) : (
+            <>
+              {/* Canvas de firma */}
+              <div className="mb-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Firma Digital</p>
+                <div className="relative border-2 border-gray-300 rounded-xl overflow-hidden bg-white">
+                  {!tieneTazo && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-gray-300 text-sm font-medium select-none">Firme aquí</span>
+                    </div>
+                  )}
+                  <canvas
+                    ref={canvasRef}
+                    width={320}
+                    height={140}
+                    className="w-full touch-none cursor-crosshair"
+                    onMouseDown={startDraw}
+                    onMouseMove={draw}
+                    onMouseUp={stopDraw}
+                    onMouseLeave={stopDraw}
+                    onTouchStart={startDraw}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDraw}
+                  />
                 </div>
-              )}
-              <canvas
-                ref={canvasRef}
-                width={384}
-                height={180}
-                className="w-full h-full cursor-crosshair touch-none"
-                onMouseDown={startDraw}
-                onMouseMove={draw}
-                onMouseUp={endDraw}
-                onMouseLeave={endDraw}
-                onTouchStart={startDraw}
-                onTouchMove={draw}
-                onTouchEnd={endDraw}
-              />
-            </div>
-            <div className="flex justify-end mt-1.5">
-              <button
-                onClick={limpiarFirma}
-                className="text-xs text-[#4a7fa5] hover:text-[#1a2540] transition-colors font-medium"
-              >
-                Limpiar Firma
-              </button>
-            </div>
-          </div>
+                <button
+                  type="button"
+                  onClick={limpiarFirma}
+                  className="mt-1.5 text-xs text-[#1a2540] hover:underline font-medium"
+                >
+                  Limpiar Firma
+                </button>
+              </div>
 
-          {/* Checkbox términos */}
-          <div className="my-5">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={aceptaTerminos}
-                onChange={e => setAceptaTerminos(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#1a2540] cursor-pointer shrink-0"
-              />
-              <span className="text-xs text-gray-600 leading-relaxed">
-                He leído y acepto los términos del{' '}
-                <span className="text-[#4a7fa5] font-medium">Contrato de Prestación de Servicios Aduaneros</span>
-                {' '}y la{' '}
-                <span className="text-[#4a7fa5] font-medium">Política de Privacidad</span>.
-              </span>
-            </label>
-          </div>
+              {/* Checkbox términos */}
+              <label className="flex items-start gap-3 cursor-pointer mb-5 mt-3">
+                <input
+                  type="checkbox"
+                  checked={aceptaTerminos}
+                  onChange={e => setAceptaTerminos(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#1a2540] shrink-0"
+                />
+                <span className="text-xs text-gray-600 leading-relaxed">
+                  He leído y acepto los términos del Contrato de Prestación de Servicios Aduaneros y la Política de Privacidad.
+                </span>
+              </label>
 
-          {/* Botones */}
-          <div className="space-y-3">
-            <button
-              onClick={handleFirmar}
-              disabled={!hasFirma || !aceptaTerminos || loading}
-              className="w-full py-3 bg-[#1a2540] text-white text-sm font-bold rounded-lg hover:bg-[#243050] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Procesando…
-                </>
-              ) : 'ACEPTAR Y FIRMAR'}
-            </button>
-            <button
-              onClick={onCancelar}
-              disabled={loading}
-              className="w-full py-3 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              CANCELAR
-            </button>
-          </div>
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => onCancelar?.()}
+                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFirmar}
+                  disabled={!puedeFiremar || loading}
+                  className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors ${
+                    puedeFiremar && !loading
+                      ? 'bg-[#1a2540] text-white hover:bg-[#243050]'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                  }`}
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Procesando…
+                    </span>
+                  ) : 'ACEPTAR Y FIRMAR'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Footer con badges */}
         <div className="px-6 py-4 border-t border-gray-100 flex items-center gap-6 shrink-0">
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
             <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

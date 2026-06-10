@@ -55,8 +55,9 @@ public class EmailService
         </html>";
     }
 
-    public string GenerarPlantillaRecuperacion(string nombre, string correo, string codigo)
+    public string GenerarPlantillaRecuperacion(string nombre, string correo, string token)
     {
+        var link = $"http://localhost:5173?token={token}";
         return $@"
         <html>
         <body style='font-family:Segoe UI; padding:32px; background:#f5f7fa;'>
@@ -73,13 +74,16 @@ public class EmailService
                 <p style='color:#374151;'>Hola <b>{nombre}</b>,</p>
                 <p style='color:#374151;'>Recibimos una solicitud para restablecer el acceso a tu cuenta asociada al correo <b>{correo}</b>.</p>
 
-                <div style='background:#f0f4f8; border-radius:8px; padding:16px; margin:20px 0; text-align:center;'>
-                    <p style='color:#6b7280; font-size:13px; margin:0 0 8px;'>Tu código de recuperación es:</p>
-                    <span style='font-size:28px; font-weight:bold; color:#1a2540; letter-spacing:4px;'>{codigo}</span>
+                <div style='text-align:center; margin:28px 0;'>
+                    <a href='{link}'
+                       style='display:inline-block; background:#1a2540; color:#ffffff; text-decoration:none;
+                              font-weight:bold; font-size:15px; padding:14px 32px; border-radius:8px;'>
+                        Restablecer contraseña
+                    </a>
                 </div>
 
-                <p style='color:#6b7280; font-size:13px;'>Este código tiene una validez de <b>30 minutos</b>. Si no solicitaste este correo, ignóralo.</p>
-                <p style='color:#6b7280; font-size:13px; margin-top:16px;'>Para ingresar al sistema: <a href='http://localhost:5173' style='color:#3b82f6;'>http://localhost:5173</a></p>
+                <p style='color:#6b7280; font-size:13px;'>Este enlace tiene una validez de <b>30 minutos</b>. Si no solicitaste este correo, ignóralo.</p>
+                <p style='color:#6b7280; font-size:12px; word-break:break-all;'>Si el botón no funciona, copia y pega este enlace en tu navegador:<br/><a href='{link}' style='color:#3b82f6;'>{link}</a></p>
 
                 <hr style='border:none; border-top:1px solid #e5e7eb; margin:24px 0;'/>
                 <p style='color:#9ca3af; font-size:11px; text-align:center; margin:0;'>© 2026 Logística Broker Perú S.A.C. — Todos los derechos reservados.</p>

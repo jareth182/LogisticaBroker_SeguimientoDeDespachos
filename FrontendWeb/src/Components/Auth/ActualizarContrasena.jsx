@@ -1,40 +1,60 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-export default function Login({ onLoginExitoso, onIrRecuperar }) {
-    const [correo, setCorreo]         = useState('');
-    const [contrasena, setContrasena] = useState('');
+export default function ActualizarContrasena({ onActualizado }) {
+    const [nuevaContrasena, setNueva] = useState('');
+    const [confirmar, setConfirmar]   = useState('');
     const [loading, setLoading]       = useState(false);
     const [error, setError]           = useState('');
+    const [exitoso, setExitoso]       = useState(false);
 
-    const API_BASE_URL = 'http://localhost:5018/api/Auth';
+    useEffect(() => {
+        if (exitoso) {
+            const t = setTimeout(onActualizado, 2000);
+            return () => clearTimeout(t);
+        }
+    }, [exitoso, onActualizado]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (nuevaContrasena !== confirmar) {
+            setError('Las contraseñas no coinciden.');
+            return;
+        }
         setError('');
         setLoading(true);
-
         try {
-            const response = await fetch(`${API_BASE_URL}/login`, {
+            const response = await fetch('http://localhost:5018/api/Auth/actualizar-contrasena', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ correo, contrasena })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ nuevaContrasena })
             });
-
-            const data = await response.json();
-
             if (response.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('usuario', JSON.stringify(data.usuario));
-                onLoginExitoso(data.usuario);
+                setExitoso(true);
             } else {
-                setError(data.mensaje || 'Credenciales inválidas. Verifica tu correo y contraseña.');
+                const data = await response.json();
+                setError(data.mensaje || 'Error al actualizar la contraseña.');
             }
         } catch {
-            setError('No se pudo conectar con el servidor. Verifica que el backend esté corriendo.');
+            setError('No se pudo conectar con el servidor.');
         } finally {
             setLoading(false);
         }
     };
+
+    if (exitoso) {
+        return (
+            <div className="min-h-screen bg-[#edf1f7] flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-md px-10 py-10 w-full max-w-sm text-center">
+                    <p className="text-sm font-medium text-gray-700">
+                        Contraseña actualizada exitosamente
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#edf1f7] flex items-center justify-center p-4">
@@ -52,7 +72,7 @@ export default function Login({ onLoginExitoso, onIrRecuperar }) {
                     Logística Broker Perú S.A.C.
                 </h1>
                 <p className="text-center text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-6">
-                    Iniciar Sesion
+                    Actualizar contraseña
                 </p>
 
                 {error && (
@@ -62,31 +82,9 @@ export default function Login({ onLoginExitoso, onIrRecuperar }) {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-
                     <div>
                         <label className="block text-sm font-semibold text-[#4a7fa5] mb-1">
-                            Email
-                        </label>
-                        <div className="relative">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                            </span>
-                            <input
-                                type="email"
-                                required
-                                value={correo}
-                                onChange={e => setCorreo(e.target.value)}
-                                placeholder="coordinador@brokerperu.com"
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none text-sm bg-white"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-[#4a7fa5] mb-1">
-                            Password
+                            Nueva contraseña
                         </label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -97,22 +95,33 @@ export default function Login({ onLoginExitoso, onIrRecuperar }) {
                             <input
                                 type="password"
                                 required
-                                value={contrasena}
-                                onChange={e => setContrasena(e.target.value)}
+                                value={nuevaContrasena}
+                                onChange={e => setNueva(e.target.value)}
                                 placeholder="••••••••"
                                 className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none text-sm bg-white"
                             />
                         </div>
                     </div>
 
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            onClick={onIrRecuperar}
-                            className="text-sm text-blue-500 hover:underline"
-                        >
-                            ¿Olvidaste tu contraseña?
-                        </button>
+                    <div>
+                        <label className="block text-sm font-semibold text-[#4a7fa5] mb-1">
+                            Confirmar contraseña
+                        </label>
+                        <div className="relative">
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                            </span>
+                            <input
+                                type="password"
+                                required
+                                value={confirmar}
+                                onChange={e => setConfirmar(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none text-sm bg-white"
+                            />
+                        </div>
                     </div>
 
                     <button
@@ -120,14 +129,9 @@ export default function Login({ onLoginExitoso, onIrRecuperar }) {
                         disabled={loading}
                         className={`w-full py-3 bg-[#1a2540] text-white font-semibold rounded-lg hover:bg-[#243050] transition-colors text-sm ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
-                        {loading ? 'Autenticando...' : 'INICIAR SESION'}
+                        {loading ? 'Actualizando...' : 'ACTUALIZAR'}
                     </button>
-
                 </form>
-
-                <p className="mt-6 text-center text-xs text-gray-400">
-                    Sistema de Gestión Institucional v2.4
-                </p>
             </div>
         </div>
     );

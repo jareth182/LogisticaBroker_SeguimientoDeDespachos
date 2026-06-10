@@ -1,30 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function RecuperarContrasena({ onVolver }) {
-    const [correo, setCorreo]   = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError]     = useState('');
-    const [enviado, setEnviado] = useState(false);
+    const [correo, setCorreo]           = useState('');
+    const [nuevaContrasena, setNueva]   = useState('');
+    const [confirmar, setConfirmar]     = useState('');
+    const [token, setToken]             = useState('');
+    const [loading, setLoading]         = useState(false);
+    const [error, setError]             = useState('');
+    // pantalla: 'form' | 'enviado' | 'nueva-contrasena' | 'cambiado'
+    const [pantalla, setPantalla]       = useState('form');
 
     const API_BASE_URL = 'http://localhost:5018/api/Auth';
 
-    const handleSubmit = async (e) => {
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const t = params.get('token');
+        if (t) {
+            setToken(t);
+            setPantalla('nueva-contrasena');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (pantalla === 'cambiado') {
+            const timer = setTimeout(onVolver, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [pantalla, onVolver]);
+
+    const handleEnviar = async (e) => {
         e.preventDefault();
         setError('');
         setLoading(true);
-
         try {
             const response = await fetch(`${API_BASE_URL}/recuperar-contrasena`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ correo })
             });
-
-            const data = await response.json();
-
             if (response.ok) {
-                setEnviado(true);
+                setPantalla('enviado');
             } else {
+                const data = await response.json();
                 setError(data.mensaje || 'Ocurrió un error. Intenta nuevamente.');
             }
         } catch {
@@ -34,11 +51,37 @@ export default function RecuperarContrasena({ onVolver }) {
         }
     };
 
+    const handleCambiar = async (e) => {
+        e.preventDefault();
+        if (nuevaContrasena !== confirmar) {
+            setError('Las contraseñas no coinciden.');
+            return;
+        }
+        setError('');
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/cambiar-contrasena`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, nuevaContrasena })
+            });
+            if (response.ok) {
+                setPantalla('cambiado');
+            } else {
+                const data = await response.json();
+                setError(data.mensaje || 'Error al cambiar la contraseña.');
+            }
+        } catch {
+            setError('No se pudo conectar con el servidor.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#edf1f7] flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-md px-10 py-10 w-full max-w-sm">
 
-                {/* Ícono camión */}
                 <div className="flex justify-center mb-5">
                     <div className="w-14 h-14 bg-[#1a2540] rounded-xl flex items-center justify-center">
                         <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
@@ -47,32 +90,23 @@ export default function RecuperarContrasena({ onVolver }) {
                     </div>
                 </div>
 
-                {/* Título empresa */}
                 <p className="text-center text-sm font-bold text-gray-900 mb-4">
                     Logística Broker Perú S.A.C.
                 </p>
 
-                {enviado ? (
-                    /* ── Estado: correo enviado ── */
-                    <div className="text-center">
-                        <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2">Correo enviado</h2>
-                        <p className="text-sm text-gray-500 mb-6">
-                            Si el correo <span className="font-semibold text-gray-700">{correo}</span> está registrado, recibirás las instrucciones para restablecer tu acceso.
-                        </p>
-                        <button
-                            onClick={onVolver}
-                            className="w-full py-3 bg-[#1a2540] text-white font-semibold rounded-lg text-sm hover:bg-[#243050] transition-colors"
-                        >
-                            Volver al inicio de sesión
-                        </button>
-                    </div>
-                ) : (
-                    /* ── Formulario ── */
+                {pantalla === 'enviado' && (
+                    <p className="text-sm text-gray-700 text-center">
+                        Te hemos enviado un correo con las instrucciones para recuperar tu contraseña
+                    </p>
+                )}
+
+                {pantalla === 'cambiado' && (
+                    <p className="text-sm text-gray-700 text-center">
+                        Tu contraseña ha sido actualizada correctamente
+                    </p>
+                )}
+
+                {pantalla === 'form' && (
                     <>
                         <h2 className="text-center text-2xl font-bold text-gray-900 mb-2">
                             Recuperar Contraseña
@@ -87,9 +121,7 @@ export default function RecuperarContrasena({ onVolver }) {
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
-
-                            {/* Correo */}
+                        <form onSubmit={handleEnviar} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-semibold text-[#4a7fa5] mb-1">
                                     Correo corporativo registrado
@@ -111,35 +143,64 @@ export default function RecuperarContrasena({ onVolver }) {
                                 </div>
                             </div>
 
-                            {/* Botón */}
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className={`w-full py-3 bg-[#1a2540] text-white font-semibold rounded-lg flex items-center justify-center gap-2 hover:bg-[#243050] transition-colors text-sm ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                                className={`w-full py-3 bg-[#1a2540] text-white font-semibold rounded-lg text-sm hover:bg-[#243050] transition-colors ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                {loading ? 'Enviando...' : 'RECUPERAR CONTRASEÑA'}
+                                {loading ? 'Enviando...' : 'ENVIAR'}
                             </button>
-
                         </form>
+                    </>
+                )}
 
-                        {/* Divisor */}
-                        <div className="my-5 border-t border-gray-200" />
+                {pantalla === 'nueva-contrasena' && (
+                    <>
+                        <h2 className="text-center text-2xl font-bold text-gray-900 mb-6">
+                            Nueva contraseña
+                        </h2>
 
-                        {/* Volver al login */}
-                        <div className="text-center">
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleCambiar} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-[#4a7fa5] mb-1">
+                                    Nueva contraseña
+                                </label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={nuevaContrasena}
+                                    onChange={e => setNueva(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-[#4a7fa5] mb-1">
+                                    Confirmar contraseña
+                                </label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={confirmar}
+                                    onChange={e => setConfirmar(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                                />
+                            </div>
                             <button
-                                onClick={onVolver}
-                                className="text-sm text-blue-500 hover:underline flex items-center justify-center gap-1 mx-auto"
+                                type="submit"
+                                disabled={loading}
+                                className={`w-full py-3 bg-[#1a2540] text-white font-semibold rounded-lg text-sm hover:bg-[#243050] transition-colors ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                             >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                                </svg>
-                                Regresar al Login
+                                {loading ? 'Procesando...' : 'CAMBIAR CONTRASEÑA'}
                             </button>
-                        </div>
+                        </form>
                     </>
                 )}
             </div>

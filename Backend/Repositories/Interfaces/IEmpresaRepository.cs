@@ -8,4 +8,5 @@ public interface IEmpresaRepository : IRepository<Empresa>
     Task<Empresa?> GetByCorreoAsync(string correo);
     Task<bool> ExisteRucAsync(string ruc);
     Task<IEnumerable<Empresa>> BuscarPorRucORazonSocialAsync(string termino);
+    Task<IEnumerable<Empresa>> BuscarConContratoFirmadoAsync(string termino);
 }

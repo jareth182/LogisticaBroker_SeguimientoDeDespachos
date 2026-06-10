@@ -3,14 +3,21 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LogisticaBroker.Controllers;
 
+public class ExtraerDatosRequest
+{
+    public IFormFile? Archivo { get; set; }
+}
+
 [ApiController]
 [Route("api/[controller]")]
 public class FacturaController : ControllerBase
 {
     // POST /api/Factura/extraer
     [HttpPost("extraer")]
-    public async Task<IActionResult> ExtraerDatos([FromForm] IFormFile? archivo)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ExtraerDatos([FromForm] ExtraerDatosRequest request)
     {
+        var archivo = request.Archivo;
         if (archivo is null || archivo.Length == 0) // PA HU10-1.1 NOK — no se seleccionó ningún archivo
             return BadRequest(new { mensaje = "Debe seleccionar un archivo Excel antes de continuar." });
 

@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using LogisticaBroker.DTOs;
 using LogisticaBroker.Services;
+using System.Security.Claims;
 
 namespace LogisticaBroker.Controllers;
 
@@ -52,6 +54,55 @@ public class AuthController : ControllerBase
         catch (Exception)
         {
             return StatusCode(500, new { mensaje = "No se pudo enviar el correo. Intenta nuevamente." });
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // POST /api/Auth/cambiar-contrasena
+    // ─────────────────────────────────────────────────────────
+    [HttpPost("cambiar-contrasena")]
+    public async Task<IActionResult> CambiarContrasena([FromBody] CambiarContrasenaDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        try
+        {
+            await _authService.CambiarContrasenaAsync(dto);
+            return Ok(new { mensaje = "Contraseña actualizada correctamente." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { mensaje = "No se pudo actualizar la contraseña. Intenta nuevamente." });
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // POST /api/Auth/actualizar-contrasena — primer login post-firma
+    // ─────────────────────────────────────────────────────────
+    [Authorize]
+    [HttpPost("actualizar-contrasena")]
+    public async Task<IActionResult> ActualizarContrasena([FromBody] ActualizarContrasenaDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(idClaim, out int idUsuario))
+            return Unauthorized(new { mensaje = "Token inválido." });
+
+        try
+        {
+            await _authService.ActualizarContrasenaAsync(idUsuario, dto.NuevaContrasena);
+            return Ok(new { mensaje = "Contraseña actualizada correctamente." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { mensaje = ex.Message });
         }
     }
 

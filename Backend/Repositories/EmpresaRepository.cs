@@ -23,6 +23,14 @@ public class EmpresaRepository : Repository<Empresa>, IEmpresaRepository
     public async Task<IEnumerable<Empresa>> BuscarPorRucORazonSocialAsync(string termino) =>
         await _context.Empresas
             .Where(e => e.Ruc.Contains(termino) || e.RazonSocial.Contains(termino))
-            .Take(10) // Limitamos a 10 resultados para no sobrecargar el selector
+            .Take(10)
+            .ToListAsync();
+
+    public async Task<IEnumerable<Empresa>> BuscarConContratoFirmadoAsync(string termino) =>
+        await _context.Empresas
+            .Include(e => e.Contrato)
+            .Where(e => (e.Ruc.Contains(termino) || e.RazonSocial.Contains(termino))
+                && e.Contrato != null && e.Contrato.EstadoFirma == "Firmado")
+            .Take(10)
             .ToListAsync();
 }
