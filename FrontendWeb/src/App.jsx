@@ -22,6 +22,14 @@ import AdjuntarComprobantes from './Components/Despachos/AdjuntarComprobantes';
 import ValidarComprobantes from './Components/Despachos/ValidarComprobantes';
 import RegistrarNumeracion from './Components/Despachos/RegistrarNumeracion';
 import RegistrarObservacionesAforo from './Components/Despachos/RegistrarObservacionesAforo';
+import RegistrarLevante from './Components/Despachos/RegistrarLevante';
+import RegistrarComprobantesLogisticos from './Components/Despachos/RegistrarComprobantesLogisticos';
+import ProgramarRetiroCarga from './Components/Despachos/ProgramarRetiroCarga';
+import ConfirmarEntrega from './Components/Despachos/ConfirmarEntrega';
+import ProgramarDevolucionContenedor from './Components/Despachos/ProgramarDevolucionContenedor';
+import GenerarLiquidacionFinal from './Components/Despachos/GenerarLiquidacionFinal';
+import SeguimientoImportacion from './Components/Tracking/SeguimientoImportacion';
+import PanelControl from './Components/Dashboard/PanelControl';
 
 function tokenEstaExpirado(token) {
   try {
@@ -163,6 +171,7 @@ export default function App() {
           {usuario?.rol === 'Cliente' ? (<>
             {usuario.estadoEmpresa === 'Afiliado Activo' ? (<>
               <NavItem icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" text="Panel de Trazabilidad" onClick={() => setView('trazabilidad')} collapsed={isCollapsed} active={view === 'trazabilidad'} />
+              <NavItem icon="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" text="Seguimiento de Importación" onClick={() => setView('seguimiento-importacion')} collapsed={isCollapsed} active={view === 'seguimiento-importacion'} />
               <NavItem icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" text="Mis Documentos" onClick={() => setView('documentos')} collapsed={isCollapsed} active={view === 'documentos'} />
             </>) : (<>
               <NavItem icon="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" text="Documentación" onClick={() => setView('documentacion')} collapsed={isCollapsed} active={view === 'documentacion'} />
@@ -191,6 +200,13 @@ export default function App() {
             onClick={() => setView('trazabilidad')}
             collapsed={isCollapsed}
             active={view === 'trazabilidad'}
+          />
+          <NavItem
+            icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            text="Panel de Control"
+            onClick={() => setView('panel-control')}
+            collapsed={isCollapsed}
+            active={view === 'panel-control'}
           />
 
           {!isCollapsed && (
@@ -289,6 +305,13 @@ export default function App() {
                   onValidarComprobantes={(d) => { setDespachoActivo(d); setView('validar-comprobantes'); }}
                   onRegistrarNumeracion={(d) => { setDespachoActivo(d); setView('registrar-numeracion'); }}
                   onObservacionesAforo={(d) => { setDespachoActivo(d); setView('observaciones-aforo'); }}
+                  onRegistrarLevante={(d) => { setDespachoActivo(d); setView('registrar-levante'); }}
+                  onComprobantesLogisticos={(d) => { setDespachoActivo(d); setView('comprobantes-logisticos'); }}
+                  onProgramarRetiro={(d) => { setDespachoActivo(d); setView('programar-retiro'); }}
+                  onConfirmarEntrega={(d) => { setDespachoActivo(d); setView('confirmar-entrega'); }}
+                  onDevolucionContenedor={(d) => { setDespachoActivo(d); setView('devolucion-contenedor'); }}
+                  onLiquidacionFinal={(d) => { setDespachoActivo(d); setView('liquidacion-final'); }}
+                  onVerSeguimiento={(d) => { setDespachoActivo(d); setView('seguimiento-importacion'); }}
               />
           )}
 
@@ -395,6 +418,7 @@ export default function App() {
                   despacho={despachoActivo}
                   onVolver={() => setView('despachos')}
                   usuario={usuario}
+                  onAdjuntarComprobante={(d) => { setDespachoActivo(d); setView('adjuntar-comprobantes'); }}
               />
           )}
 
@@ -431,6 +455,72 @@ export default function App() {
                   onVolver={() => setView('despachos')}
                   usuario={usuario}
               />
+          )}
+
+          {/* ── HU18: Registrar Levante Mercancía ── */}
+          {view === 'registrar-levante' && (
+              <RegistrarLevante
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
+          {/* ── HU19: Registrar Comprobantes Logísticos ── */}
+          {view === 'comprobantes-logisticos' && (
+              <RegistrarComprobantesLogisticos
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  onAsignarTransporte={(d) => { setDespachoActivo(d); setView('programar-retiro'); }}
+              />
+          )}
+
+          {/* ── HU20: Programar Retiro Carga ── */}
+          {view === 'programar-retiro' && (
+              <ProgramarRetiroCarga
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
+          {/* ── HU21: Confirmar Entrega de Mercancía ── */}
+          {view === 'confirmar-entrega' && (
+              <ConfirmarEntrega
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
+          {/* ── HU22: Programar Devolución Contenedor ── */}
+          {view === 'devolucion-contenedor' && (
+              <ProgramarDevolucionContenedor
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
+          {/* ── HU23: Generar Liquidación Final ── */}
+          {view === 'liquidacion-final' && (
+              <GenerarLiquidacionFinal
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
+          {/* ── HU24: Visualizar Seguimiento Importación ── */}
+          {view === 'seguimiento-importacion' && (
+              <SeguimientoImportacion
+                  despacho={despachoActivo}
+              />
+          )}
+
+          {/* ── HU25: Visualizar Panel Control ── */}
+          {view === 'panel-control' && (
+              <PanelControl />
           )}
 
           {/* ── Clientes ── */}

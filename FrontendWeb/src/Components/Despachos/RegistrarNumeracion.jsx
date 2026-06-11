@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
-const REGEX_DAM = /^[A-Za-z0-9]{6,20}$/;
+// Formato estándar SUNAT: dos letras seguidas de diez dígitos (ej. CO0123456789)
+const REGEX_DAM = /^[A-Za-z]{2}[0-9]{10}$/;
 
 export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }) {
     const [numeracion, setNumeracion] = useState('');
@@ -116,7 +117,7 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
                         type="text"
                         value={numeracion}
                         onChange={handleNumeracionChange}
-                        placeholder="Ej. C01234567890"
+                        placeholder="Ej. CO0123456789"
                         className={`w-full border rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#008b9c] ${
                             (intentoRegistrar && !numeracion.trim()) || errorFormato
                                 ? 'border-red-400 bg-red-50'

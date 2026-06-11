@@ -23,7 +23,7 @@ function EstadoBadge({ estado }) {
 }
 
 /* ── Botón de acciones ────────────────────────────────────── */
-function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, esCliente }) {
+function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, onRegistrarLevante, onComprobantesLogisticos, onProgramarRetiro, onConfirmarEntrega, onDevolucionContenedor, onLiquidacionFinal, onVerSeguimiento, esCliente }) {
     const [abierto, setAbierto] = useState(false);
     const ref = useRef(null);
 
@@ -148,6 +148,75 @@ function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtra
                             Observaciones de aforo
                         </button>
                     )}
+
+                    {/* HU18: Registrar levante — solo Admin/Despachador */}
+                    {!esCliente && (
+                        <button onClick={() => accion(onRegistrarLevante)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                            <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Registrar levante
+                        </button>
+                    )}
+
+                    {/* HU19: Comprobantes logísticos — solo Admin/Jefe de Operaciones */}
+                    {!esCliente && (
+                        <button onClick={() => accion(onComprobantesLogisticos)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                            <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Comprobantes logísticos
+                        </button>
+                    )}
+
+                    {/* HU20: Programar retiro de carga — solo Admin/Jefe de Operaciones */}
+                    {!esCliente && (
+                        <button onClick={() => accion(onProgramarRetiro)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                            <svg className="w-4 h-4 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8h4l3 3v5a1 1 0 01-1 1h-1" />
+                            </svg>
+                            Programar retiro de carga
+                        </button>
+                    )}
+
+                    {/* HU21: Confirmar entrega — solo Admin/Jefe de Operaciones */}
+                    {!esCliente && (
+                        <button onClick={() => accion(onConfirmarEntrega)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Confirmar entrega
+                        </button>
+                    )}
+
+                    {/* HU22: Programar devolución de contenedor — solo Admin/Jefe de Operaciones */}
+                    {!esCliente && (
+                        <button onClick={() => accion(onDevolucionContenedor)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                            <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Programar devolución contenedor
+                        </button>
+                    )}
+
+                    {/* HU23: Generar liquidación final — solo Admin/Facturador */}
+                    {!esCliente && (
+                        <button onClick={() => accion(onLiquidacionFinal)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                            </svg>
+                            Generar liquidación final
+                        </button>
+                    )}
+
+                    {/* HU24: Ver seguimiento de importación — Admin y Cliente */}
+                    <button onClick={() => accion(onVerSeguimiento)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Ver seguimiento
+                    </button>
                 </div>
             )}
         </div>
@@ -155,7 +224,7 @@ function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtra
 }
 
 /* ── Componente principal ─────────────────────────────────── */
-export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo }) {
+export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, onRegistrarLevante, onComprobantesLogisticos, onProgramarRetiro, onConfirmarEntrega, onDevolucionContenedor, onLiquidacionFinal, onVerSeguimiento }) {
     const [despachos, setDespachos]           = useState([]);
     const [loading, setLoading]               = useState(true);
     const [busqueda, setBusqueda]             = useState('');
@@ -348,6 +417,13 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocume
                                             onValidarComprobantes={onValidarComprobantes}
                                             onRegistrarNumeracion={onRegistrarNumeracion}
                                             onObservacionesAforo={onObservacionesAforo}
+                                            onRegistrarLevante={onRegistrarLevante}
+                                            onComprobantesLogisticos={onComprobantesLogisticos}
+                                            onProgramarRetiro={onProgramarRetiro}
+                                            onConfirmarEntrega={onConfirmarEntrega}
+                                            onDevolucionContenedor={onDevolucionContenedor}
+                                            onLiquidacionFinal={onLiquidacionFinal}
+                                            onVerSeguimiento={onVerSeguimiento}
                                         />
                                     </td>
                                 </tr>

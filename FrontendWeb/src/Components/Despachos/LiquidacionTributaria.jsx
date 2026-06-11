@@ -14,6 +14,8 @@ const TRIBUTOS_FAKE = {
     igv: IGV,
     ipm: IPM,
     percepcionSUNAT: (CIF + AD_VALOREM + IGV + IPM) * 0.035,
+    // Detalle HU13: la Percepción SUNAT solo se muestra cuando el régimen del despacho la requiere
+    requierePercepcion: true,
     tieneAjuste: true,
     motivoAjuste: 'Multa por subvaloración declarada — Resolución SUNAT N° 0342-2024',
     montoAjuste: 1850.00,
@@ -22,7 +24,7 @@ const TRIBUTOS_FAKE = {
     calculado: true,
 };
 
-export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
+export default function LiquidacionTributaria({ despacho, onVolver, usuario, onAdjuntarComprobante }) {
     const [mostrarDetalleAjuste, setMostrarDetalleAjuste] = useState(false);
     const [errorDescarga, setErrorDescarga] = useState('');
 
@@ -31,7 +33,11 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
     const fmt = (n) =>
         (n * TIPO_CAMBIO).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const total = datos.adValorem + datos.igv + datos.ipm + datos.percepcionSUNAT + (datos.tieneAjuste ? datos.montoAjuste : 0);
+    const percepcion = datos.requierePercepcion ? datos.percepcionSUNAT : 0;
+    const total = datos.adValorem + datos.igv + datos.ipm + percepcion + (datos.tieneAjuste ? datos.montoAjuste : 0);
+
+    // HU14 CA1: desde la pestaña de liquidación tributaria con estado "Pendiente de Pago"
+    const puedeAdjuntarComprobante = despacho?.estado === 'Pendiente de Pago';
 
     // CA4: descarga PDF con desglose, moneda, tipo cambio, fecha generación y nombre usuario
     const handleDescargar = () => {
@@ -49,7 +55,7 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
                 `Ad Valorem (6%): S/ ${fmt(datos.adValorem)}`,
                 `IGV (16%): S/ ${fmt(datos.igv)}`,
                 `IPM (2%): S/ ${fmt(datos.ipm)}`,
-                `Percepción SUNAT (3.5%): S/ ${fmt(datos.percepcionSUNAT)}`,
+                datos.requierePercepcion ? `Percepción SUNAT (3.5%): S/ ${fmt(datos.percepcionSUNAT)}` : null,
                 datos.tieneAjuste ? `Ajuste / Multa SUNAT: S/ ${fmt(datos.montoAjuste)}` : null,
                 `Total a Pagar: S/ ${fmt(total)}`,
             ].filter(Boolean).join('\n');
@@ -174,11 +180,14 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
                                 <td className="px-5 py-3 text-right text-gray-600">2%</td>
                                 <td className="px-5 py-3 text-right font-semibold text-gray-800">S/ {fmt(datos.ipm)}</td>
                             </tr>
-                            <tr>
-                                <td className="px-5 py-3 text-gray-700">Percepción SUNAT</td>
-                                <td className="px-5 py-3 text-right text-gray-600">3.5%</td>
-                                <td className="px-5 py-3 text-right font-semibold text-gray-800">S/ {fmt(datos.percepcionSUNAT)}</td>
-                            </tr>
+                            {/* Detalle HU13: Percepción SUNAT solo si el régimen la requiere */}
+                            {datos.requierePercepcion && (
+                                <tr>
+                                    <td className="px-5 py-3 text-gray-700">Percepción SUNAT</td>
+                                    <td className="px-5 py-3 text-right text-gray-600">3.5%</td>
+                                    <td className="px-5 py-3 text-right font-semibold text-gray-800">S/ {fmt(datos.percepcionSUNAT)}</td>
+                                </tr>
+                            )}
                             {datos.tieneAjuste && (
                                 <tr className="bg-orange-50">
                                     <td className="px-5 py-3 text-orange-700 font-medium">Ajuste / Multa SUNAT</td>
@@ -202,11 +211,30 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
                 </div>
             )}
 
-            {/* CA4: botón DESCARGAR RESUMEN TRIBUTARIO */}
-            <div className="flex justify-end">
+            {/* Botones de acción */}
+            <div className="flex justify-end gap-3">
+                {/* HU14 CA1: botón ADJUNTAR COMPROBANTE — visible con estado "Pendiente de Pago" */}
+                {puedeAdjuntarComprobante && (
+                    <button
+                        onClick={() => onAdjuntarComprobante?.(despacho)}
+                        className="flex items-center gap-2 px-6 py-3 bg-[#008b9c] hover:bg-[#007685] text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        ADJUNTAR COMPROBANTE
+                    </button>
+                )}
+
+                {/* CA4: botón DESCARGAR RESUMEN TRIBUTARIO — deshabilitado si no hay borrador (Detalle HU13) */}
                 <button
                     onClick={handleDescargar}
-                    className="flex items-center gap-2 px-6 py-3 bg-[#1a2540] hover:bg-[#243050] text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+                    disabled={!datos.calculado}
+                    className={`flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-xl transition-colors shadow-sm ${
+                        !datos.calculado
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
+                            : 'bg-[#1a2540] hover:bg-[#243050] text-white'
+                    }`}
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

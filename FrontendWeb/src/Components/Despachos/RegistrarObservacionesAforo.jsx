@@ -10,6 +10,8 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
     const [historial, setHistorial] = useState([]);
     const [ultimoResultado, setUltimoResultado] = useState(null);
     const [error, setError] = useState('');
+    // Detalle HU17: una vez marcada y confirmada la conformidad final, no se admiten nuevas observaciones
+    const [conformidadFinal, setConformidadFinal] = useState(false);
 
     // CA2.1: habilitado si hay texto en observación O casilla marcada
     const puedeRegistrar = observacion.trim() !== '' || conformidad;
@@ -41,6 +43,8 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                 };
                 setHistorial(prev => [...prev, entrada]);
                 setUltimoResultado(conformidad ? 'levante' : 'observado');
+                // Detalle HU17: al confirmar la conformidad se bloquea la pantalla para nuevas observaciones
+                if (conformidad) setConformidadFinal(true);
                 setObservacion('');
                 setConformidad(false);
                 setIntentoRegistrar(false);
@@ -87,9 +91,16 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                 </div>
             )}
 
+            {/* Detalle HU17: conformidad final confirmada → no se admiten nuevas observaciones desde esta pantalla */}
+            {conformidadFinal && (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 mb-6">
+                    La conformidad final fue registrada. No es posible agregar nuevas observaciones desde esta pantalla.
+                </div>
+            )}
+
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
 
-                {/* CA3.1: campo de texto — deshabilitado cuando conformidad está marcada */}
+                {/* CA3.1: campo de texto — deshabilitado cuando conformidad está marcada (y viceversa tras conformidad final) */}
                 <div className="mb-4">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Observación
@@ -97,26 +108,27 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                     <textarea
                         value={observacion}
                         onChange={e => setObservacion(e.target.value.slice(0, MAX_CHARS))}
-                        disabled={conformidad}
+                        disabled={conformidad || conformidadFinal}
                         placeholder="Ingrese el detalle del requerimiento de SUNAT..."
                         rows={4}
                         className={`w-full border rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#008b9c] resize-none ${
-                            conformidad ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
+                            conformidad || conformidadFinal ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
                         }`}
                     />
                     {/* CA2.2: contador de caracteres — máximo 1000 */}
-                    {!conformidad && (
+                    {!conformidad && !conformidadFinal && (
                         <p className="text-xs text-gray-400 text-right mt-1">{observacion.length}/{MAX_CHARS}</p>
                     )}
                 </div>
 
-                {/* CA3.1: casilla conformidad */}
-                <label className="flex items-center gap-3 cursor-pointer mb-5">
+                {/* CA3.1: casilla conformidad — mutuamente excluyente con el campo de texto (y viceversa) */}
+                <label className={`flex items-center gap-3 mb-5 ${observacion.trim() !== '' || conformidadFinal ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                     <input
                         type="checkbox"
                         checked={conformidad}
                         onChange={handleConformidadChange}
-                        className="w-4 h-4 rounded border-gray-300 text-[#008b9c] focus:ring-[#008b9c]"
+                        disabled={observacion.trim() !== '' || conformidadFinal}
+                        className="w-4 h-4 rounded border-gray-300 text-[#008b9c] focus:ring-[#008b9c] disabled:cursor-not-allowed"
                     />
                     <span className="text-sm text-gray-700">Marcar conformidad y solicitar levante</span>
                 </label>
@@ -139,9 +151,9 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                 <div className="flex justify-end">
                     <button
                         onClick={handleRegistrar}
-                        disabled={procesando}
+                        disabled={procesando || conformidadFinal}
                         className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-colors shadow-sm ${
-                            !puedeRegistrar || procesando
+                            !puedeRegistrar || procesando || conformidadFinal
                                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
                                 : 'bg-[#1a2540] hover:bg-[#243050] text-white'
                         }`}
