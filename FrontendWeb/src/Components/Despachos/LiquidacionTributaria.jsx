@@ -10,6 +10,10 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario, onA
     const [fob, setFob] = useState(null);
     const [cargando, setCargando] = useState(true);
     const [errorDescarga, setErrorDescarga] = useState('');
+    // PA HU13-1.2: error al cargar los montos tributarios
+    const [errorCarga, setErrorCarga] = useState('');
+    // PA HU13-3.1: error al cargar el detalle del ajuste
+    const [errorDetalleAjuste, setErrorDetalleAjuste] = useState('');
 
     useEffect(() => {
         const fetchItems = async () => {
@@ -138,6 +142,21 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario, onA
             setErrorDescarga('Error al generar el resumen tributario. Intenta nuevamente.');
         }
     };
+
+    // PA HU13-1.3: no muestra la sección si el rol no está autorizado
+    if (sinPermiso) {
+        return (
+            <div className="max-w-4xl mx-auto">
+                <button onClick={onVolver} className="flex items-center gap-1.5 text-sm text-gray-500 mb-4 hover:text-[#008b9c] transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                    ← Volver
+                </button>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                    No tienes permisos para acceder a esta sección
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-4xl mx-auto">

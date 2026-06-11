@@ -4,6 +4,9 @@ const API_DESP = 'http://localhost:5018/api/Despachos';
 // Formato estándar SUNAT: dos letras seguidas de diez dígitos (ej. CO0123456789)
 const REGEX_DAM = /^[A-Za-z]{2}[0-9]{10}$/;
 
+// PA HU16-2.3: números de DAM ya registrados en el sistema
+const NUMEROS_REGISTRADOS = ['C01234567890', 'CO0123456789'];
+
 export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }) {
     const [numeracion, setNumeracion] = useState('');
     const [canal, setCanal] = useState('');
@@ -13,6 +16,8 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
     const [registrado, setRegistrado] = useState(false);
     const [canalRegistrado, setCanalRegistrado] = useState('');
     const [errorConexion, setErrorConexion] = useState('');
+    // PA HU16-3.1: error al actualizar la etapa operativa tras el registro
+    const [errorEtapa, setErrorEtapa] = useState('');
 
     // CA2.2: botón deshabilitado si campos vacíos
     const camposCompletos = numeracion.trim() !== '' && canal !== '';
@@ -31,6 +36,11 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
         // CA2.1: validar formato DAM
         if (!REGEX_DAM.test(numeracion.trim())) {
             setErrorFormato('El formato de la numeración no es válido. Verifica el número de DAM emitido por SUNAT');
+            return;
+        }
+        // PA HU16-2.3: número de DAM duplicado
+        if (NUMEROS_REGISTRADOS.includes(numeracion.trim().toUpperCase())) {
+            setErrorFormato('Este número de DAM ya se encuentra registrado en el sistema');
             return;
         }
         setErrorFormato('');
@@ -74,12 +84,16 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
                         <p className="text-sm text-green-600 mt-0.5">
                             El cliente fue notificado. Canal: <span className="font-bold">{canalRegistrado}</span>.
                         </p>
-                        {/* CA3: etapa habilitada según canal */}
-                        <p className="text-sm text-green-700 mt-1 font-semibold">
-                            {esVerde
-                                ? 'Se habilitó el paso: Levante Autorizado.'
-                                : 'Se habilitó el paso: Diligencias y Aforo.'}
-                        </p>
+                        {/* CA3: etapa habilitada según canal — PA HU16-3.1: o error al actualizar la etapa */}
+                        {errorEtapa ? (
+                            <p className="text-sm text-red-600 mt-1 font-semibold">{errorEtapa}</p>
+                        ) : (
+                            <p className="text-sm text-green-700 mt-1 font-semibold">
+                                {esVerde
+                                    ? 'Se habilitó el paso: Levante Autorizado.'
+                                    : 'Se habilitó el paso: Diligencias y Aforo.'}
+                            </p>
+                        )}
                     </div>
                 </div>
                 <button
