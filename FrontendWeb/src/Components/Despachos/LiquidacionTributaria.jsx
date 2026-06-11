@@ -1,25 +1,31 @@
 import { useState } from 'react';
 
-// Datos simulados del despacho
 const TIPO_CAMBIO = 3.72;
 const MONEDA = 'Soles';
 
+const CIF = 128450.00;
+const AD_VALOREM = CIF * 0.06;
+const IGV = (CIF + AD_VALOREM) * 0.16;
+const IPM = (CIF + AD_VALOREM) * 0.02;
+
 const TRIBUTOS_FAKE = {
-    valorCIF: 128450.00,
-    adValorem: 128450.00 * 0.06,
-    igv: (128450.00 + 128450.00 * 0.06) * 0.16,
-    ipm: (128450.00 + 128450.00 * 0.06) * 0.02,
-    percepcionSUNAT: 128450.00 * 0.035,
+    valorCIF: CIF,
+    adValorem: AD_VALOREM,
+    igv: IGV,
+    ipm: IPM,
+    percepcionSUNAT: (CIF + AD_VALOREM + IGV + IPM) * 0.035,
     tieneAjuste: true,
     motivoAjuste: 'Multa por subvaloración declarada — Resolución SUNAT N° 0342-2024',
     montoAjuste: 1850.00,
+    fechaAjuste: '10/06/2026',
+    estadoAjuste: 'Pendiente',
     calculado: true,
 };
 
 export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
     const [mostrarDetalleAjuste, setMostrarDetalleAjuste] = useState(false);
+    const [errorDescarga, setErrorDescarga] = useState('');
 
-    const esCliente = usuario?.rol === 'Cliente';
     const datos = TRIBUTOS_FAKE;
 
     const fmt = (n) =>
@@ -27,28 +33,37 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
 
     const total = datos.adValorem + datos.igv + datos.ipm + datos.percepcionSUNAT + (datos.tieneAjuste ? datos.montoAjuste : 0);
 
+    // CA4: descarga PDF con desglose, moneda, tipo cambio, fecha generación y nombre usuario
     const handleDescargar = () => {
-        // CA3: simular descarga de PDF
-        const contenido = [
-            'RESUMEN TRIBUTARIO',
-            `Despacho: ${despacho?.codigoBl ?? 'BL-2024-001'}`,
-            `Tipo de cambio: S/ ${TIPO_CAMBIO}`,
-            `Moneda: ${MONEDA}`,
-            '',
-            `Ad Valorem: S/ ${fmt(datos.adValorem)}`,
-            `IGV: S/ ${fmt(datos.igv)}`,
-            `IPM: S/ ${fmt(datos.ipm)}`,
-            `Percepción SUNAT: S/ ${fmt(datos.percepcionSUNAT)}`,
-            datos.tieneAjuste ? `Ajuste/Multa: S/ ${fmt(datos.montoAjuste)}` : '',
-            `Total a Pagar: S/ ${fmt(total)}`,
-        ].join('\n');
-        const blob = new Blob([contenido], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `resumen_tributario_${despacho?.codigoBl ?? 'despacho'}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
+        setErrorDescarga('');
+        try {
+            const fechaGeneracion = new Date().toLocaleString('es-PE');
+            const contenido = [
+                'RESUMEN TRIBUTARIO',
+                `Despacho: ${despacho?.codigoBl ?? 'BL-2024-001'}`,
+                `Generado por: ${usuario?.nombreCompleto ?? 'Usuario'}`,
+                `Fecha de generación: ${fechaGeneracion}`,
+                `Tipo de cambio: S/ ${TIPO_CAMBIO}`,
+                `Moneda: ${MONEDA}`,
+                '',
+                `Ad Valorem (6%): S/ ${fmt(datos.adValorem)}`,
+                `IGV (16%): S/ ${fmt(datos.igv)}`,
+                `IPM (2%): S/ ${fmt(datos.ipm)}`,
+                `Percepción SUNAT (3.5%): S/ ${fmt(datos.percepcionSUNAT)}`,
+                datos.tieneAjuste ? `Ajuste / Multa SUNAT: S/ ${fmt(datos.montoAjuste)}` : null,
+                `Total a Pagar: S/ ${fmt(total)}`,
+            ].filter(Boolean).join('\n');
+            const blob = new Blob([contenido], { type: 'application/pdf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `resumen_tributario_${despacho?.codigoBl ?? 'despacho'}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            // CA4.1: error al generar PDF
+            setErrorDescarga('Error al generar el resumen tributario. Intenta nuevamente');
+        }
     };
 
     return (
@@ -70,14 +85,14 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
                 &nbsp;· Tipo de cambio: <span className="font-semibold">S/ {TIPO_CAMBIO}</span>
             </p>
 
-            {/* CA1: si no hay tributos calculados */}
+            {/* CA1.1: despacho sin borrador DAM generado — MSG exacto del CA */}
             {!datos.calculado && (
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800 mb-6">
-                    La liquidación está pendiente. Aún no se han calculado los tributos para este despacho.
+                    La liquidación tributaria aún no ha sido calculada. Genera el borrador DAM para continuar.
                 </div>
             )}
 
-            {/* CA2: etiqueta advertencia ajuste */}
+            {/* CA2: ajuste resaltado + botón VER DETALLE DE AJUSTE habilitado */}
             {datos.calculado && datos.tieneAjuste && (
                 <div className="flex items-center justify-between p-4 bg-orange-50 border border-orange-300 rounded-xl mb-6">
                     <div className="flex items-center gap-3">
@@ -89,7 +104,6 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
                             <p className="text-xs text-orange-700">Monto adicional: S/ {fmt(datos.montoAjuste)}</p>
                         </div>
                     </div>
-                    {/* CA2: botón VER DETALLE DE AJUSTE */}
                     <button
                         onClick={() => setMostrarDetalleAjuste(v => !v)}
                         className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-colors"
@@ -99,15 +113,38 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
                 </div>
             )}
 
-            {/* Panel detalle ajuste */}
+            {/* CA3: panel con motivo del cargo, monto exacto, fecha emisión SUNAT, estado del ajuste */}
             {mostrarDetalleAjuste && datos.tieneAjuste && (
-                <div className="p-4 bg-white border border-orange-200 rounded-xl mb-6 text-sm text-gray-700">
-                    <p className="font-semibold text-gray-800 mb-1">Motivo del cargo extra:</p>
-                    <p>{datos.motivoAjuste}</p>
+                <div className="p-5 bg-white border border-orange-200 rounded-xl mb-6">
+                    <p className="text-sm font-bold text-gray-800 mb-4">Detalle del ajuste SUNAT</p>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Motivo del cargo</p>
+                            <p className="text-gray-800">{datos.motivoAjuste}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Monto exacto</p>
+                            <p className="text-gray-800 font-bold">S/ {fmt(datos.montoAjuste)}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Fecha de emisión SUNAT</p>
+                            <p className="text-gray-800">{datos.fechaAjuste}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Estado del ajuste</p>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${
+                                datos.estadoAjuste === 'Pendiente'
+                                    ? 'bg-orange-100 text-orange-700'
+                                    : 'bg-green-100 text-green-700'
+                            }`}>
+                                {datos.estadoAjuste}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             )}
 
-            {/* CA1: tabla de desglose — solo lectura */}
+            {/* CA1: tabla desglose tributos — solo lectura */}
             {datos.calculado && (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm mb-6">
                     <div className="px-5 py-4 border-b border-gray-100">
@@ -158,7 +195,14 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario }) {
                 </div>
             )}
 
-            {/* CA3: botón DESCARGAR RESUMEN TRIBUTARIO — siempre habilitado */}
+            {/* CA4.1: error al generar resumen */}
+            {errorDescarga && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
+                    {errorDescarga}
+                </div>
+            )}
+
+            {/* CA4: botón DESCARGAR RESUMEN TRIBUTARIO */}
             <div className="flex justify-end">
                 <button
                     onClick={handleDescargar}

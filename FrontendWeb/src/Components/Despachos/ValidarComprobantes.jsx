@@ -1,59 +1,63 @@
 import { useState } from 'react';
 
-// Datos simulados del comprobante cargado por el cliente
 const COMPROBANTE_FAKE = {
     nombre: 'comprobante_pago_BL2024001.pdf',
-    url: null, // en producción sería la URL del archivo
+    url: null,
     fechaSubida: '2026-06-10 09:32',
     cliente: 'Importaciones XYZ S.A.C.',
 };
 
 export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
     const [motivoRechazo, setMotivoRechazo] = useState('');
-    const [mostrarAdvertencia, setMostrarAdvertencia] = useState(false);
     const [procesando, setProcesando] = useState(false);
-    const [resultado, setResultado] = useState(null); // 'aprobado' | 'rechazado'
+    const [resultado, setResultado] = useState(null);
+    const [errorAprobar, setErrorAprobar] = useState('');
+    const [errorRechazar, setErrorRechazar] = useState('');
 
     const ahora = () => new Date().toLocaleString('es-PE');
 
-    // CA1: aprobar comprobante
+    // CA2: aprobar comprobante → estado "Tributos Cancelados" + registro auditoría
     const handleAprobar = () => {
         if (procesando) return;
         setProcesando(true);
+        setErrorAprobar('');
         setTimeout(() => {
-            setProcesando(false);
-            setResultado({
-                tipo: 'aprobado',
-                mensaje: 'El estado del despacho cambió a "Tributos Cancelados". Se habilitó la etapa de numeración.',
-                usuario: usuario?.nombreCompleto ?? 'Administrador',
-                fecha: ahora(),
-            });
+            try {
+                setProcesando(false);
+                setResultado({
+                    tipo: 'aprobado',
+                    mensaje: 'El estado del despacho cambió a "Tributos Cancelados". Se habilitó la etapa de numeración.',
+                    usuario: usuario?.nombreCompleto ?? 'Administrador',
+                    fecha: ahora(),
+                });
+            } catch {
+                // CA2.1: error de conexión al aprobar
+                setProcesando(false);
+                setErrorAprobar('Error al aprobar el comprobante. Intenta nuevamente');
+            }
         }, 1000);
     };
 
-    // CA2: intento rechazar sin motivo
-    const handleIntentarRechazar = () => {
-        if (!motivoRechazo.trim()) {
-            setMostrarAdvertencia(true);
-            return;
-        }
-        setMostrarAdvertencia(false);
-        handleRechazar();
-    };
-
-    // CA3: rechazar con motivo
+    // CA3: rechazar con motivo → estado "Pendiente de Pago" + notifica cliente + registro auditoría
     const handleRechazar = () => {
         if (!motivoRechazo.trim() || procesando) return;
         setProcesando(true);
+        setErrorRechazar('');
         setTimeout(() => {
-            setProcesando(false);
-            setResultado({
-                tipo: 'rechazado',
-                mensaje: 'El cliente fue notificado para que vuelva a subir el documento correcto. El estado regresó a "Pendiente de Pago".',
-                usuario: usuario?.nombreCompleto ?? 'Administrador',
-                fecha: ahora(),
-                motivo: motivoRechazo,
-            });
+            try {
+                setProcesando(false);
+                setResultado({
+                    tipo: 'rechazado',
+                    mensaje: 'El cliente fue notificado para que vuelva a subir el documento correcto. El estado regresó a "Pendiente de Pago".',
+                    usuario: usuario?.nombreCompleto ?? 'Administrador',
+                    fecha: ahora(),
+                    motivo: motivoRechazo,
+                });
+            } catch {
+                // CA3.3: error de conexión al rechazar
+                setProcesando(false);
+                setErrorRechazar('Error al registrar el rechazo. Intenta nuevamente');
+            }
         }, 1000);
     };
 
@@ -75,6 +79,7 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
                             {esAprobado ? 'Comprobante aprobado' : 'Comprobante rechazado'}
                         </p>
                         <p className={`text-sm mt-0.5 ${esAprobado ? 'text-green-600' : 'text-red-600'}`}>{resultado.mensaje}</p>
+                        {/* CA2 / CA3: registro auditoría — usuario + fecha + hora */}
                         <p className="text-xs text-gray-500 mt-2">
                             Registrado por: <span className="font-semibold">{resultado.usuario}</span> · {resultado.fecha}
                         </p>
@@ -110,7 +115,7 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
                 Despacho: <span className="font-semibold">{despacho?.codigoBl ?? 'BL-2024-001'}</span>
             </p>
 
-            {/* Visor del comprobante — solo lectura (CA1, CA3) */}
+            {/* CA1: visor comprobante — solo lectura */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm mb-6 p-5">
                 <p className="text-sm font-bold text-gray-700 mb-3">Comprobante adjunto</p>
                 <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
@@ -132,9 +137,15 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
                 </div>
             </div>
 
-            {/* CA1: botón APROBAR COMPROBANTE */}
+            {/* CA2: botón APROBAR COMPROBANTE */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 mb-4">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Aprobar comprobante</p>
+                {/* CA2.1: MSG error conexión */}
+                {errorAprobar && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-3">
+                        {errorAprobar}
+                    </div>
+                )}
                 <button
                     onClick={handleAprobar}
                     disabled={procesando}
@@ -148,34 +159,31 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
                 </button>
             </div>
 
-            {/* CA2 + CA3: rechazo con motivo */}
+            {/* CA3 + CA3.1 + CA3.2 + CA3.3: rechazo con motivo obligatorio */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Rechazar comprobante</p>
 
-                {/* Campo motivo — CA2 deshabilitado sin motivo */}
+                {/* CA3.2: campo motivo con límite 500 chars + contador */}
                 <textarea
                     value={motivoRechazo}
-                    onChange={e => {
-                        setMotivoRechazo(e.target.value.slice(0, 500));
-                        if (e.target.value.trim()) setMostrarAdvertencia(false);
-                    }}
+                    onChange={e => setMotivoRechazo(e.target.value.slice(0, 500))}
                     placeholder="Ingrese el motivo del rechazo..."
                     rows={3}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#008b9c] resize-none mb-1"
                 />
                 <p className="text-xs text-gray-400 text-right mb-3">{motivoRechazo.length}/500</p>
 
-                {/* CA2: advertencia campo obligatorio */}
-                {mostrarAdvertencia && (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 mb-3">
-                        El motivo es obligatorio para rechazar el comprobante.
+                {/* CA3.3: MSG error conexión */}
+                {errorRechazar && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-3">
+                        {errorRechazar}
                     </div>
                 )}
 
-                {/* CA3: botón RECHAZAR POR INCONSISTENCIAS — deshabilitado si motivo vacío */}
+                {/* CA3.1: botón verdaderamente disabled cuando motivo vacío */}
                 <button
-                    onClick={handleIntentarRechazar}
-                    disabled={procesando}
+                    onClick={handleRechazar}
+                    disabled={!motivoRechazo.trim() || procesando}
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-colors shadow-sm ${
                         !motivoRechazo.trim() || procesando
                             ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'

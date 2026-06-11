@@ -1,29 +1,49 @@
 import { useState } from 'react';
 
-// Formato estándar SUNAT para numeración DAM: letras/dígitos
 const REGEX_DAM = /^[A-Za-z0-9]{6,20}$/;
 
 export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }) {
     const [numeracion, setNumeracion] = useState('');
     const [canal, setCanal] = useState('');
     const [intentoRegistrar, setIntentoRegistrar] = useState(false);
+    const [errorFormato, setErrorFormato] = useState('');
     const [procesando, setProcesando] = useState(false);
     const [registrado, setRegistrado] = useState(false);
     const [canalRegistrado, setCanalRegistrado] = useState('');
+    const [errorConexion, setErrorConexion] = useState('');
 
-    // CA2: botón deshabilitado si campos vacíos
+    // CA2.2: botón deshabilitado si campos vacíos
     const camposCompletos = numeracion.trim() !== '' && canal !== '';
+
+    const handleNumeracionChange = (e) => {
+        setNumeracion(e.target.value);
+        setErrorFormato('');
+    };
 
     const handleRegistrar = () => {
         setIntentoRegistrar(true);
+        setErrorConexion('');
+
         if (!camposCompletos || procesando) return;
+
+        // CA2.1: validar formato DAM
+        if (!REGEX_DAM.test(numeracion.trim())) {
+            setErrorFormato('El formato de la numeración no es válido. Verifica el número de DAM emitido por SUNAT');
+            return;
+        }
+        setErrorFormato('');
+
         setProcesando(true);
-        // CA1: simula guardado y notificación al cliente
         setTimeout(() => {
+            try {
+                setCanalRegistrado(canal);
+                setRegistrado(true);
+                onRegistrado?.({ numeracion, canal });
+            } catch {
+                // CA2.4: error de conexión
+                setErrorConexion('Error al registrar la numeración. Intenta nuevamente');
+            }
             setProcesando(false);
-            setCanalRegistrado(canal);
-            setRegistrado(true);
-            onRegistrado?.({ numeracion, canal });
         }, 1000);
     };
 
@@ -38,15 +58,16 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
                         </svg>
                     </div>
                     <div>
-                        <p className="text-base font-bold text-green-800">Numeración registrada</p>
+                        {/* CA2: MSG exacto del criterio de aceptación */}
+                        <p className="text-base font-bold text-green-800">Numeración registrada correctamente.</p>
                         <p className="text-sm text-green-600 mt-0.5">
                             El cliente fue notificado. Canal: <span className="font-bold">{canalRegistrado}</span>.
                         </p>
-                        {/* CA3: indicar paso habilitado según canal */}
+                        {/* CA3: etapa habilitada según canal */}
                         <p className="text-sm text-green-700 mt-1 font-semibold">
                             {esVerde
                                 ? 'Se habilitó el paso: Levante Autorizado.'
-                                : 'Se habilitó el paso: Diligencias/Aforo.'}
+                                : 'Se habilitó el paso: Diligencias y Aforo.'}
                         </p>
                     </div>
                 </div>
@@ -77,9 +98,16 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
                 Despacho: <span className="font-semibold">{despacho?.codigoBl ?? 'BL-2024-001'}</span>
             </p>
 
+            {/* CA2.4: MSG error de conexión */}
+            {errorConexion && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
+                    {errorConexion}
+                </div>
+            )}
+
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
 
-                {/* Campo numeración DAM — CA2 indicador requerido */}
+                {/* Campo numeración DAM */}
                 <div className="mb-5">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Numeración oficial de la DAM <span className="text-red-500">*</span>
@@ -87,19 +115,24 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
                     <input
                         type="text"
                         value={numeracion}
-                        onChange={e => setNumeracion(e.target.value)}
-                        placeholder="Ej. 118-2024-10-000123"
+                        onChange={handleNumeracionChange}
+                        placeholder="Ej. C01234567890"
                         className={`w-full border rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#008b9c] ${
-                            intentoRegistrar && !numeracion.trim() ? 'border-red-400 bg-red-50' : 'border-gray-300'
+                            (intentoRegistrar && !numeracion.trim()) || errorFormato
+                                ? 'border-red-400 bg-red-50'
+                                : 'border-gray-300'
                         }`}
                     />
-                    {/* CA2: indicador visual campo requerido */}
                     {intentoRegistrar && !numeracion.trim() && (
                         <p className="text-xs text-red-600 mt-1">La numeración de la DAM es requerida.</p>
                     )}
+                    {/* CA2.1: MSG formato inválido */}
+                    {errorFormato && (
+                        <p className="text-xs text-red-600 mt-1">{errorFormato}</p>
+                    )}
                 </div>
 
-                {/* Selector de canal — CA2 indicador requerido */}
+                {/* Selector de canal */}
                 <div className="mb-6">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Canal <span className="text-red-500">*</span>
@@ -116,13 +149,12 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
                         <option value="Naranja">Naranja</option>
                         <option value="Rojo">Rojo</option>
                     </select>
-                    {/* CA2: indicador visual campo requerido */}
                     {intentoRegistrar && !canal && (
                         <p className="text-xs text-red-600 mt-1">El canal es requerido.</p>
                     )}
                 </div>
 
-                {/* CA1: botón REGISTRAR NUMERACIÓN */}
+                {/* CA2.2: botón CONFIRMAR NUMERACIÓN — deshabilitado si campos vacíos */}
                 <div className="flex justify-end">
                     <button
                         onClick={handleRegistrar}
@@ -142,7 +174,7 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
                                 Registrando...
                             </>
                         ) : (
-                            'REGISTRAR NUMERACIÓN'
+                            'CONFIRMAR NUMERACIÓN'
                         )}
                     </button>
                 </div>

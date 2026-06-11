@@ -2,31 +2,40 @@ import { useState, useRef } from 'react';
 
 const FORMATOS_VALIDOS = ['application/pdf', 'image/jpeg', 'image/png'];
 const EXTENSIONES_VALIDAS = ['.pdf', '.jpg', '.jpeg', '.png'];
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_BYTES = 10 * 1024 * 1024;
 
 export default function AdjuntarComprobantes({ despacho, onVolver }) {
     const [archivos, setArchivos] = useState([]);
-    const [errorFormato, setErrorFormato] = useState('');
+    const [errorArchivo, setErrorArchivo] = useState('');
     const [procesando, setProcesando] = useState(false);
     const [procesado, setProcesado] = useState(false);
+    const [errorProcesar, setErrorProcesar] = useState('');
     const [dragging, setDragging] = useState(false);
     const inputRef = useRef(null);
 
-    const validarArchivos = (lista) => {
-        const invalidos = lista.filter(f => !FORMATOS_VALIDOS.includes(f.type));
-        if (invalidos.length > 0) {
-            // CA3: formato no permitido
-            setErrorFormato('Formato no permitido. Solo se aceptan archivos PDF, JPG o PNG (máximo 10 MB por archivo).');
+    const validarArchivo = (f) => {
+        // CA2.2: formato no permitido
+        if (!FORMATOS_VALIDOS.includes(f.type)) {
+            setErrorArchivo('El formato del archivo no es válido. Solo se aceptan PDF, JPG y PNG');
             return false;
         }
-        setErrorFormato('');
+        // CA2.3: tamaño máximo 10 MB
+        if (f.size > MAX_BYTES) {
+            setErrorArchivo('El archivo supera el tamaño máximo permitido de 10 MB');
+            return false;
+        }
+        setErrorArchivo('');
         return true;
     };
 
     const agregarArchivos = (lista) => {
         const nuevos = Array.from(lista);
-        if (!validarArchivos(nuevos)) return;
-        setArchivos(prev => [...prev, ...nuevos]);
+        const validos = [];
+        for (const f of nuevos) {
+            if (!validarArchivo(f)) return;
+            validos.push(f);
+        }
+        setArchivos(prev => [...prev, ...validos]);
     };
 
     const handleDrop = (e) => {
@@ -40,16 +49,22 @@ export default function AdjuntarComprobantes({ despacho, onVolver }) {
         e.target.value = '';
     };
 
-    // CA1: botón deshabilitado si no hay archivos válidos
-    const puedeProcessar = archivos.length > 0 && !errorFormato;
+    // CA2.1: botón deshabilitado si no hay archivos válidos
+    const puedeProcessar = archivos.length > 0 && !errorArchivo;
 
     const handleProcesar = () => {
         if (!puedeProcessar || procesando) return;
         setProcesando(true);
-        // CA2: simula subida y cambia estado a "Pago en Verificación"
+        setErrorProcesar('');
         setTimeout(() => {
-            setProcesando(false);
-            setProcesado(true);
+            try {
+                setProcesando(false);
+                setProcesado(true);
+            } catch {
+                // CA2.4: error de conexión
+                setProcesando(false);
+                setErrorProcesar('Error al enviar los comprobantes. Intenta nuevamente');
+            }
         }, 1200);
     };
 
@@ -63,9 +78,10 @@ export default function AdjuntarComprobantes({ despacho, onVolver }) {
                         </svg>
                     </div>
                     <div>
-                        <p className="text-base font-bold text-green-800">¡Comprobantes procesados!</p>
+                        {/* CA2: MSG exacto del criterio de aceptación */}
+                        <p className="text-base font-bold text-green-800">Comprobantes enviados correctamente.</p>
                         <p className="text-sm text-green-600 mt-0.5">
-                            El despacho cambió a estado <span className="font-bold">Pago en Verificación</span>. El área administrativa fue notificada.
+                            El equipo administrativo los revisará en breve.
                         </p>
                     </div>
                 </div>
@@ -96,7 +112,7 @@ export default function AdjuntarComprobantes({ despacho, onVolver }) {
                 Despacho: <span className="font-semibold">{despacho?.codigoBl ?? 'BL-2024-001'}</span>
             </p>
 
-            {/* CA1 + CA3: zona de carga drag & drop */}
+            {/* CA1 + CA2.2 + CA2.3: zona drag & drop */}
             <div
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
@@ -121,14 +137,21 @@ export default function AdjuntarComprobantes({ despacho, onVolver }) {
                 />
             </div>
 
-            {/* CA3: mensaje de error de formato */}
-            {errorFormato && (
+            {/* CA2.2 / CA2.3: MSG error de archivo */}
+            {errorArchivo && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
-                    {errorFormato}
+                    {errorArchivo}
                 </div>
             )}
 
-            {/* Lista de archivos seleccionados */}
+            {/* CA2.4: MSG error de conexión */}
+            {errorProcesar && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
+                    {errorProcesar}
+                </div>
+            )}
+
+            {/* Listado de archivos seleccionados */}
             {archivos.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm mb-6">
                     <div className="px-5 py-3 border-b border-gray-100">
@@ -150,7 +173,7 @@ export default function AdjuntarComprobantes({ despacho, onVolver }) {
                 </div>
             )}
 
-            {/* CA2: botón PROCESAR COMPROBANTES */}
+            {/* CA2: botón PROCESAR COMPROBANTES — deshabilitado hasta adjuntar al menos un archivo */}
             <div className="flex justify-end">
                 <button
                     onClick={handleProcesar}

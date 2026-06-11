@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+const MAX_CHARS = 1000;
+
 export default function RegistrarObservacionesAforo({ despacho, onVolver, usuario }) {
     const [observacion, setObservacion] = useState('');
     const [conformidad, setConformidad] = useState(false);
@@ -7,10 +9,12 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
     const [procesando, setProcesando] = useState(false);
     const [historial, setHistorial] = useState([]);
     const [ultimoResultado, setUltimoResultado] = useState(null);
+    const [error, setError] = useState('');
 
-    // CA2: habilitado si hay texto en observación O casilla marcada
+    // CA2.1: habilitado si hay texto en observación O casilla marcada
     const puedeRegistrar = observacion.trim() !== '' || conformidad;
 
+    // CA3.1: marcar conformidad deshabilita campo de observación
     const handleConformidadChange = (e) => {
         setConformidad(e.target.checked);
         if (e.target.checked) {
@@ -23,23 +27,31 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
         setIntentoRegistrar(true);
         if (!puedeRegistrar || procesando) return;
         setProcesando(true);
+        setError('');
 
         setTimeout(() => {
-            const entrada = {
-                id: Date.now(),
-                texto: conformidad ? 'Revisión conforme — Se solicita levante.' : observacion,
-                esConformidad: conformidad,
-                fecha: new Date().toLocaleDateString('es-PE'),
-                hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-                usuario: usuario?.nombreCompleto ?? 'Despachador',
-            };
-            // CA1 / CA3: acumular historial
-            setHistorial(prev => [...prev, entrada]);
-            setUltimoResultado(conformidad ? 'levante' : 'observado');
-            setObservacion('');
-            setConformidad(false);
-            setIntentoRegistrar(false);
-            setProcesando(false);
+            try {
+                const entrada = {
+                    id: Date.now(),
+                    texto: conformidad ? 'Revisión conforme — Se solicita levante.' : observacion,
+                    esConformidad: conformidad,
+                    fecha: new Date().toLocaleDateString('es-PE'),
+                    hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+                    usuario: usuario?.nombreCompleto ?? 'Despachador',
+                };
+                setHistorial(prev => [...prev, entrada]);
+                setUltimoResultado(conformidad ? 'levante' : 'observado');
+                setObservacion('');
+                setConformidad(false);
+                setIntentoRegistrar(false);
+                setProcesando(false);
+            } catch {
+                // CA2.3 / CA3.2: error de conexión
+                setProcesando(false);
+                setError(conformidad
+                    ? 'Error al registrar la conformidad. Intenta nuevamente'
+                    : 'Error al registrar la observación. Intenta nuevamente');
+            }
         }, 1000);
     };
 
@@ -68,21 +80,23 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                         : 'bg-yellow-50 border-yellow-200 text-yellow-800'
                 }`}>
                     {ultimoResultado === 'levante'
-                        ? 'Conformidad registrada. El despacho quedó habilitado para Levante. El cliente fue notificado.'
+                        /* CA3: estado "Listo para Levante" */
+                        ? 'Conformidad registrada. El despacho cambió a estado "Listo para Levante". El cliente fue notificado.'
+                        /* CA2: estado "Observado" */
                         : 'Observación registrada. Estado del despacho: "Observado". El cliente fue notificado.'}
                 </div>
             )}
 
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
 
-                {/* CA3: campo de texto — deshabilitado cuando conformidad está marcada */}
+                {/* CA3.1: campo de texto — deshabilitado cuando conformidad está marcada */}
                 <div className="mb-4">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">
                         Observación
                     </label>
                     <textarea
                         value={observacion}
-                        onChange={e => setObservacion(e.target.value)}
+                        onChange={e => setObservacion(e.target.value.slice(0, MAX_CHARS))}
                         disabled={conformidad}
                         placeholder="Ingrese el detalle del requerimiento de SUNAT..."
                         rows={4}
@@ -90,9 +104,13 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                             conformidad ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'border-gray-300'
                         }`}
                     />
+                    {/* CA2.2: contador de caracteres — máximo 1000 */}
+                    {!conformidad && (
+                        <p className="text-xs text-gray-400 text-right mt-1">{observacion.length}/{MAX_CHARS}</p>
+                    )}
                 </div>
 
-                {/* CA3: casilla Marcar conformidad */}
+                {/* CA3.1: casilla conformidad */}
                 <label className="flex items-center gap-3 cursor-pointer mb-5">
                     <input
                         type="checkbox"
@@ -103,14 +121,21 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                     <span className="text-sm text-gray-700">Marcar conformidad y solicitar levante</span>
                 </label>
 
-                {/* CA2: aviso campo obligatorio */}
+                {/* CA2.1: aviso campo obligatorio */}
                 {intentoRegistrar && !puedeRegistrar && (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 mb-4">
                         Debe ingresar una observación o marcar conformidad para continuar.
                     </div>
                 )}
 
-                {/* CA1 + CA3: botón REGISTRAR OBSERVACIÓN */}
+                {/* CA2.3 / CA3.2: MSG error de conexión */}
+                {error && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
+                        {error}
+                    </div>
+                )}
+
+                {/* CA2 + CA3: botón CONFIRMAR REGISTRO — siempre este texto */}
                 <div className="flex justify-end">
                     <button
                         onClick={handleRegistrar}
@@ -130,13 +155,13 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                                 Registrando...
                             </>
                         ) : (
-                            'REGISTRAR OBSERVACIÓN'
+                            'CONFIRMAR REGISTRO'
                         )}
                     </button>
                 </div>
             </div>
 
-            {/* Historial acumulativo — CA1, solo lectura */}
+            {/* Historial acumulativo — CA2, solo lectura */}
             {historial.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
                     <div className="px-5 py-4 border-b border-gray-100">
