@@ -97,6 +97,9 @@ public class AuthService
         if (usuario.TokenExpiracionUtc < DateTime.UtcNow)
             throw new InvalidOperationException("El token ha expirado. Solicita una nueva recuperación.");
 
+        if (dto.NuevaContrasena.Length < 8)
+            throw new InvalidOperationException("La contraseña debe tener mínimo 8 caracteres.");
+
         usuario.ContrasenaHash      = BCrypt.Net.BCrypt.HashPassword(dto.NuevaContrasena);
         usuario.TokenRecuperacion   = null;
         usuario.TokenExpiracionUtc  = null;
@@ -110,6 +113,12 @@ public class AuthService
     {
         var usuario = await _context.Usuarios.FindAsync(idUsuario)
             ?? throw new InvalidOperationException("Usuario no encontrado.");
+
+        if (nuevaContrasena.Length < 8 ||
+            !nuevaContrasena.Any(char.IsUpper) ||
+            !nuevaContrasena.Any(char.IsDigit) ||
+            !nuevaContrasena.Any(c => !char.IsLetterOrDigit(c)))
+            throw new InvalidOperationException("La contraseña debe tener mínimo 8 caracteres, una mayúscula, un número y un carácter especial.");
 
         usuario.ContrasenaHash           = BCrypt.Net.BCrypt.HashPassword(nuevaContrasena);
         usuario.DebeActualizarContrasena = false;

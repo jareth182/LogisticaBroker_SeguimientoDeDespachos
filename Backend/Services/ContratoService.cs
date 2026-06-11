@@ -102,7 +102,14 @@ public class ContratoService
         var empresa = await _context.Empresas.FindAsync(empresaId);
         if (empresa != null)
         {
-            empresa.Estado = "Afiliado Activo";
+            empresa.Estado = "Activo";
+            await _context.SaveChangesAsync();
+        }
+
+        var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.IdEmpresa == empresaId);
+        if (usuario != null)
+        {
+            usuario.DebeActualizarContrasena = true;
             await _context.SaveChangesAsync();
         }
     }

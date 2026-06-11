@@ -36,7 +36,8 @@ public class EmpresaService
             ContrasenaHash = BCrypt.Net.BCrypt.HashPassword(password),
             IdEmpresa      = empresa.IdEmpresa,
             IdRol          = 2,
-            Estado         = "Activo"
+            Estado         = "Activo",
+            DebeActualizarContrasena = false
         };
 
         _context.Usuarios.Add(usuario);
