@@ -23,7 +23,7 @@ function EstadoBadge({ estado }) {
 }
 
 /* ── Botón de acciones ────────────────────────────────────── */
-function BtnAcciones({ despacho, onVerDetalle, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, esCliente }) {
+function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, esCliente }) {
     const [abierto, setAbierto] = useState(false);
     const ref = useRef(null);
 
@@ -59,6 +59,32 @@ function BtnAcciones({ despacho, onVerDetalle, onVerTributos, onAdjuntarComproba
                         </svg>
                         Ver detalle
                     </button>
+
+                    {/* HU09: Documentación Logística — solo Admin */}
+                    {!esCliente && (
+                        <button
+                            onClick={() => accion(onDocumentacionLogistica)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Documentación logística
+                        </button>
+                    )}
+
+                    {/* HU10: Extraer Datos Factura — solo Admin */}
+                    {!esCliente && (
+                        <button
+                            onClick={() => accion(onExtraerFactura)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            <svg className="w-4 h-4 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h7" />
+                            </svg>
+                            Extraer datos factura
+                        </button>
+                    )}
 
                     {/* HU13: Ver tributos — Admin y Cliente, siempre disponible */}
                     <button
@@ -129,7 +155,7 @@ function BtnAcciones({ despacho, onVerDetalle, onVerTributos, onAdjuntarComproba
 }
 
 /* ── Componente principal ─────────────────────────────────── */
-export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo }) {
+export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo }) {
     const [despachos, setDespachos]           = useState([]);
     const [loading, setLoading]               = useState(true);
     const [busqueda, setBusqueda]             = useState('');
@@ -315,6 +341,8 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onVerTri
                                             despacho={d}
                                             esCliente={esCliente}
                                             onVerDetalle={onVerDetalle}
+                                            onDocumentacionLogistica={onDocumentacionLogistica}
+                                            onExtraerFactura={onExtraerFactura}
                                             onVerTributos={onVerTributos}
                                             onAdjuntarComprobantes={onAdjuntarComprobantes}
                                             onValidarComprobantes={onValidarComprobantes}

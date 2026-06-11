@@ -282,6 +282,8 @@ export default function App() {
               <ListaDespachos
                   onVerDetalle={handleVerDetalle}
                   onNuevoDespacho={() => setView('nuevo-despacho')}
+                  onDocumentacionLogistica={(d) => { setDespachoActivo(d); setView('documentacion-logistica'); }}
+                  onExtraerFactura={(d) => { setDespachoActivo(d); setView('extraer-factura'); }}
                   onVerTributos={(d) => { setDespachoActivo(d); setView('liquidacion-tributaria'); }}
                   onAdjuntarComprobantes={(d) => { setDespachoActivo(d); setView('adjuntar-comprobantes'); }}
                   onValidarComprobantes={(d) => { setDespachoActivo(d); setView('validar-comprobantes'); }}
