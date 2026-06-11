@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+// PA HU13-1.3: roles habilitados para visualizar la liquidación tributaria
+const ROLES_PERMITIDOS = ['Cliente', 'Administrador'];
 
 const TIPO_CAMBIO = 3.72;
 const MONEDA = 'Soles';
@@ -27,8 +30,35 @@ const TRIBUTOS_FAKE = {
 export default function LiquidacionTributaria({ despacho, onVolver, usuario, onAdjuntarComprobante }) {
     const [mostrarDetalleAjuste, setMostrarDetalleAjuste] = useState(false);
     const [errorDescarga, setErrorDescarga] = useState('');
+    // PA HU13-1.2: error al cargar los montos tributarios
+    const [errorCarga, setErrorCarga] = useState('');
+    // PA HU13-3.1: error al cargar el detalle del ajuste
+    const [errorDetalleAjuste, setErrorDetalleAjuste] = useState('');
 
     const datos = TRIBUTOS_FAKE;
+
+    // PA HU13-1.2: carga de los montos tributarios del despacho
+    useEffect(() => {
+        try {
+            if (!TRIBUTOS_FAKE) throw new Error('sin datos');
+            setErrorCarga('');
+        } catch {
+            setErrorCarga('Error al cargar los montos tributarios. Intenta nuevamente');
+        }
+    }, []);
+
+    // PA HU13-3.1: abrir el detalle del ajuste con manejo de error
+    const handleVerDetalleAjuste = () => {
+        try {
+            setErrorDetalleAjuste('');
+            setMostrarDetalleAjuste(v => !v);
+        } catch {
+            setErrorDetalleAjuste('Error al cargar el detalle del ajuste. Intenta nuevamente');
+        }
+    };
+
+    // PA HU13-1.3: usuario con rol no autorizado
+    const sinPermiso = usuario?.rol && !ROLES_PERMITIDOS.includes(usuario.rol);
 
     const fmt = (n) =>
         (n * TIPO_CAMBIO).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -72,6 +102,21 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario, onA
         }
     };
 
+    // PA HU13-1.3: no muestra la sección si el rol no está autorizado
+    if (sinPermiso) {
+        return (
+            <div className="max-w-4xl mx-auto">
+                <button onClick={onVolver} className="flex items-center gap-1.5 text-sm text-gray-500 mb-4 hover:text-[#008b9c] transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
+                    ← Volver
+                </button>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                    No tienes permisos para acceder a esta sección
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-4xl mx-auto">
             <button
@@ -90,6 +135,13 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario, onA
                 &nbsp;· Moneda: <span className="font-semibold">{MONEDA}</span>
                 &nbsp;· Tipo de cambio: <span className="font-semibold">S/ {TIPO_CAMBIO}</span>
             </p>
+
+            {/* PA HU13-1.2: error al cargar los montos tributarios */}
+            {errorCarga && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-6">
+                    {errorCarga}
+                </div>
+            )}
 
             {/* CA1.1: despacho sin borrador DAM generado — MSG exacto del CA */}
             {!datos.calculado && (
@@ -111,11 +163,18 @@ export default function LiquidacionTributaria({ despacho, onVolver, usuario, onA
                         </div>
                     </div>
                     <button
-                        onClick={() => setMostrarDetalleAjuste(v => !v)}
+                        onClick={handleVerDetalleAjuste}
                         className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-lg transition-colors"
                     >
                         VER DETALLE DE AJUSTE
                     </button>
+                </div>
+            )}
+
+            {/* PA HU13-3.1: error al cargar el detalle del ajuste */}
+            {errorDetalleAjuste && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-6">
+                    {errorDetalleAjuste}
                 </div>
             )}
 

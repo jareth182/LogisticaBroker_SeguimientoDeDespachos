@@ -15,6 +15,11 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
     // CA1 / Detalle: previsualización inline + control de revisión por archivo
     const [previewId, setPreviewId] = useState(null);
     const [revisados, setRevisados] = useState([]);
+    // PA HU15-1.1 / 1.2: error de formato no compatible o de conexión al previsualizar
+    const [errorPreview, setErrorPreview] = useState('');
+
+    // PA HU15-1.1: formatos que pueden renderizarse en pantalla
+    const FORMATOS_RENDERIZABLES = ['pdf', 'imagen', 'jpg', 'jpeg', 'png'];
 
     const ahora = () => new Date().toLocaleString('es-PE');
 
@@ -23,9 +28,22 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
     const pendientes = comprobantes.filter(c => !revisados.includes(c.id)).length;
     const todosRevisados = pendientes === 0;
 
-    const handlePrevisualizar = (id) => {
-        setPreviewId(prev => (prev === id ? null : id));
-        setRevisados(prev => (prev.includes(id) ? prev : [...prev, id]));
+    const handlePrevisualizar = (comp) => {
+        setErrorPreview('');
+        try {
+            // El archivo se considera revisado al intentar previsualizarlo
+            setRevisados(prev => (prev.includes(comp.id) ? prev : [...prev, comp.id]));
+            // PA HU15-1.1: formato no compatible para previsualización
+            if (!FORMATOS_RENDERIZABLES.includes(comp.tipo)) {
+                setPreviewId(null);
+                setErrorPreview('No se puede previsualizar este formato. Descarga el archivo para revisarlo');
+                return;
+            }
+            setPreviewId(prev => (prev === comp.id ? null : comp.id));
+        } catch {
+            // PA HU15-1.2: error de conexión al cargar la previsualización
+            setErrorPreview('Error al cargar el comprobante. Intenta nuevamente');
+        }
     };
 
     // CA2: aprobar comprobante → estado "Tributos Cancelados" + registro auditoría
@@ -161,7 +179,7 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
                                     )}
                                     {/* CA1: ícono de previsualización — muestra el archivo en pantalla sin descargarlo */}
                                     <button
-                                        onClick={() => handlePrevisualizar(c.id)}
+                                        onClick={() => handlePrevisualizar(c)}
                                         title="Previsualizar"
                                         className={`p-2 rounded-lg transition-colors ${previewId === c.id ? 'bg-[#008b9c] text-white' : 'text-[#008b9c] hover:bg-[#e0f7fa]'}`}
                                     >
@@ -175,6 +193,13 @@ export default function ValidarComprobantes({ despacho, onVolver, usuario }) {
                         );
                     })}
                 </ul>
+
+                {/* PA HU15-1.1 / 1.2: error de formato no compatible o de conexión al previsualizar */}
+                {errorPreview && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                        {errorPreview}
+                    </div>
+                )}
 
                 {/* CA1: visor inline en modo solo lectura */}
                 {comprobantePreview && (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const MAX_CHARS = 1000;
 
@@ -10,8 +10,20 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
     const [historial, setHistorial] = useState([]);
     const [ultimoResultado, setUltimoResultado] = useState(null);
     const [error, setError] = useState('');
-    // Detalle HU17: una vez marcada y confirmada la conformidad final, no se admiten nuevas observaciones
-    const [conformidadFinal, setConformidadFinal] = useState(false);
+    // PA HU17-3.3: conformidad ya registrada en una sesión anterior (estado "Listo para Levante")
+    const [conformidadFinal, setConformidadFinal] = useState(() => despacho?.estado === 'Listo para Levante');
+    // PA HU17-1.3: error al cargar el historial del despacho
+    const [errorCarga, setErrorCarga] = useState('');
+
+    // PA HU17-1.3: carga del historial de observaciones del despacho
+    useEffect(() => {
+        try {
+            if (!despacho) throw new Error('sin despacho');
+            setErrorCarga('');
+        } catch {
+            setErrorCarga('Error al cargar las observaciones del despacho. Intenta nuevamente');
+        }
+    }, [despacho]);
 
     // CA2.1: habilitado si hay texto en observación O casilla marcada
     const puedeRegistrar = observacion.trim() !== '' || conformidad;
@@ -91,10 +103,17 @@ export default function RegistrarObservacionesAforo({ despacho, onVolver, usuari
                 </div>
             )}
 
-            {/* Detalle HU17: conformidad final confirmada → no se admiten nuevas observaciones desde esta pantalla */}
+            {/* PA HU17-1.3: error al cargar el historial del despacho */}
+            {errorCarga && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-6">
+                    {errorCarga}
+                </div>
+            )}
+
+            {/* PA HU17-3.3: conformidad ya registrada → no se admiten nuevas observaciones */}
             {conformidadFinal && (
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600 mb-6">
-                    La conformidad final fue registrada. No es posible agregar nuevas observaciones desde esta pantalla.
+                    La conformidad ya fue registrada. No es posible agregar nuevas observaciones para este despacho
                 </div>
             )}
 

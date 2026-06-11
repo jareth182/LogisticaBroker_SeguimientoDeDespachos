@@ -17,7 +17,23 @@ export default function AdjuntarComprobantes({ despacho, onVolver }) {
     const [procesado, setProcesado] = useState(false);
     const [errorProcesar, setErrorProcesar] = useState('');
     const [dragging, setDragging] = useState(false);
+    // PA HU14-3.1: error al descargar un comprobante del listado
+    const [errorDescarga, setErrorDescarga] = useState('');
     const inputRef = useRef(null);
+
+    // PA HU14-3.1: descarga de un comprobante ya adjuntado con manejo de error
+    const handleDescargarComprobante = (comprobante) => {
+        setErrorDescarga('');
+        try {
+            if (!comprobante.url) throw new Error('archivo no disponible');
+            const a = document.createElement('a');
+            a.href = comprobante.url;
+            a.download = comprobante.nombre;
+            a.click();
+        } catch {
+            setErrorDescarga('No se pudo descargar el comprobante. Intenta nuevamente');
+        }
+    };
 
     const validarArchivo = (f) => {
         // CA2.2: formato no permitido
@@ -123,20 +139,26 @@ export default function AdjuntarComprobantes({ despacho, onVolver }) {
                                     <p className="text-xs text-gray-400">{c.tamano} · Cargado el {c.fechaCarga}</p>
                                 </div>
                                 {/* CA3: ícono de descarga disponible */}
-                                <a
-                                    href={c.url ?? '#'}
-                                    download={c.nombre}
+                                <button
+                                    onClick={() => handleDescargarComprobante(c)}
                                     title="Descargar"
                                     className="ml-auto p-2 text-gray-400 hover:text-[#008b9c] transition-colors shrink-0"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                     </svg>
-                                </a>
+                                </button>
                             </li>
                         ))}
                     </ul>
                 </div>
+
+                {/* PA HU14-3.1: error al descargar un comprobante */}
+                {errorDescarga && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
+                        {errorDescarga}
+                    </div>
+                )}
 
                 {/* CA3: botón PROCESAR COMPROBANTES deshabilitado — envío ya realizado */}
                 <div className="flex justify-end">
