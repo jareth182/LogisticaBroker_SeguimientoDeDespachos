@@ -676,6 +676,13 @@ namespace LogisticaBroker.Migrations
                     b.Property<int>("IdDespacho")
                         .HasColumnType("integer");
 
+                    b.Property<decimal?>("NumCajas")
+                        .HasColumnType("numeric(10,0)");
+
+                    b.Property<string>("PaisOrigen")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("PartidaArancelaria")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
@@ -683,8 +690,18 @@ namespace LogisticaBroker.Migrations
                     b.Property<decimal>("Peso")
                         .HasColumnType("numeric(10,3)");
 
+                    b.Property<decimal?>("PesoBruto")
+                        .HasColumnType("numeric(10,3)");
+
+                    b.Property<decimal?>("PesoNeto")
+                        .HasColumnType("numeric(10,3)");
+
                     b.Property<bool>("TieneRestriccion")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("UnidadMedida")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<string>("UsuarioModificacion")
                         .HasMaxLength(150)
@@ -692,6 +709,9 @@ namespace LogisticaBroker.Migrations
 
                     b.Property<decimal>("Valor")
                         .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal?>("Volumen")
+                        .HasColumnType("numeric(10,3)");
 
                     b.HasKey("IdItem");
 

@@ -370,6 +370,12 @@ public class AppDbContext : DbContext
             e.Property(x => x.Cantidad).HasColumnType("numeric(12,3)");
             e.Property(x => x.Valor).HasColumnType("numeric(14,2)");
             e.Property(x => x.Peso).HasColumnType("numeric(10,3)");
+            e.Property(x => x.UnidadMedida).HasMaxLength(30);
+            e.Property(x => x.PaisOrigen).HasMaxLength(100);
+            e.Property(x => x.NumCajas).HasColumnType("numeric(10,0)");
+            e.Property(x => x.Volumen).HasColumnType("numeric(10,3)");
+            e.Property(x => x.PesoBruto).HasColumnType("numeric(10,3)");
+            e.Property(x => x.PesoNeto).HasColumnType("numeric(10,3)");
             e.Property(x => x.PartidaArancelaria).HasMaxLength(10);
             e.Property(x => x.UsuarioModificacion).HasMaxLength(150);
 

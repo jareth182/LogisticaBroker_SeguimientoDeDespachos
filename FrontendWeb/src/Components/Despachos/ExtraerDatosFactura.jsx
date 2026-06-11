@@ -1,18 +1,23 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 
+const API = 'http://localhost:5018/api/ItemsFactura';
+
 export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) {
     const [archivo, setArchivo]       = useState(null);
     const [dragging, setDragging]     = useState(false);
     const [extrayendo, setExtrayendo] = useState(false);
+    const [guardando, setGuardando]   = useState(false);
     const [items, setItems]           = useState([]);
     const [error, setError]           = useState(null);
+    const [mensaje, setMensaje]       = useState(null);
     const inputRef = useRef();
 
     const onFileChange = (file) => {
         if (!file) return;
         setError(null);
         setItems([]);
+        setMensaje(null);
         const ext = file.name.split('.').pop().toLowerCase();
         if (ext !== 'xlsx' && ext !== 'xls') {
             setError('El formato del archivo no es válido. Solo se aceptan XLSX y XLS');
@@ -32,7 +37,7 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
             setError('Debe seleccionar un archivo Excel antes de continuar.');
             return;
         }
-        setExtrayendo(true); setError(null);
+        setExtrayendo(true); setError(null); setMensaje(null);
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
@@ -42,22 +47,21 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                 const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                 const extracted = rows.slice(1)
                     .filter(row => row.some(cell => cell !== undefined && cell !== ''))
-                    .map(row => ({
-                        cantidad:    row[0] ?? '',
-                        descripcion: row[1] ?? '',
-                        valor:       row[2] ?? '',
-                        peso:        row[3] ?? ''
-                    }));
+                    .map(row => {
+                        const cantidad      = row[0] ?? '';
+                        const descripcion   = row[1] ?? '';
+                        const unidadMedida  = row[2] ?? '';
+                        const precioUnitario = Number(row[3]) || 0;
+                        const paisOrigen    = row[4] ?? '';
+                        const costoTotal    = Number(cantidad) * precioUnitario;
+                        return { cantidad, descripcion, unidadMedida, precioUnitario, paisOrigen, costoTotal };
+                    });
+
                 if (extracted.length === 0) {
                     setError('El archivo no contiene ítems para extraer');
                 } else {
-                    // Verificar que al menos haya datos en alguna columna esperada
-                    const tieneColumnas = extracted.some(r => r.cantidad !== '' || r.descripcion !== '' || r.valor !== '' || r.peso !== '');
-                    if (!tieneColumnas) {
-                        setError('El archivo no contiene las columnas requeridas: Cantidad, Descripción, Valor, Peso');
-                    } else {
-                        setItems(extracted);
-                    }
+                    setItems(extracted);
+                    setMensaje('Datos extraídos correctamente. Verifique y complete la información antes de continuar.');
                 }
             } catch {
                 setError('No se pudo procesar el archivo. Verifica que el archivo no esté dañado');
@@ -72,18 +76,37 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
         reader.readAsArrayBuffer(archivo);
     };
 
-    const handleDescargarPreview = () => {
+    const handleConfirmar = async () => {
         if (items.length === 0) return;
-        const ws = XLSX.utils.json_to_sheet(items.map(it => ({
-            Cantidad:    it.cantidad,
-            Descripción: it.descripcion,
-            Valor:       it.valor,
-            Peso:        it.peso
-        })));
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Vista Previa');
-        XLSX.writeFile(wb, `preview_items_${despacho.codigoOrden}.xlsx`);
+        setGuardando(true);
+        setError(null);
+        try {
+            const payload = items.map(it => ({
+                descripcion:   String(it.descripcion),
+                cantidad:      Number(it.cantidad) || 0,
+                valor:         Number(it.precioUnitario) || 0,
+                unidadMedida:  String(it.unidadMedida || ''),
+                paisOrigen:    String(it.paisOrigen || '')
+            }));
+            const res = await fetch(`${API}/${despacho.idDespacho}/guardar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                const d = await res.json();
+                setError(d.mensaje || 'Error al guardar los ítems.');
+                return;
+            }
+            onIrEditar(items);
+        } catch {
+            setError('Error al conectar con el servidor.');
+        } finally {
+            setGuardando(false);
+        }
     };
+
+    const fmt = (n) => Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -114,6 +137,12 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                 <div className="space-y-4">
                     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
                         <h2 className="text-sm font-bold text-gray-700 mb-4">Archivo Fuente</h2>
+
+                        {/* Instrucciones de columnas */}
+                        <div className="mb-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
+                            <p className="font-semibold mb-1">Formato esperado del Excel (columnas en orden):</p>
+                            <p>A: Cantidad · B: Descripción · C: Unidad de Medida · D: Precio Unitario · E: País de Origen</p>
+                        </div>
 
                         {/* Drag & drop */}
                         <div
@@ -149,15 +178,6 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                             )}
                         </div>
 
-                        {/* Botón Seleccionar Archivo — CA1 */}
-                        <button
-                            onClick={() => inputRef.current?.click()}
-                            className="w-full py-2 mb-3 border border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                            Seleccionar Archivo
-                        </button>
-
-                        {/* Botón Extraer Datos — CA2 */}
                         <button
                             onClick={handleExtraer}
                             disabled={extrayendo || !archivo}
@@ -170,7 +190,7 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                             {extrayendo ? (
                                 <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Extrayendo...</>
                             ) : (
-                                <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>Extraer Datos</>
+                                <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>EXTRAER DATOS FACTURA</>
                             )}
                         </button>
 
@@ -179,9 +199,14 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                                 {error}
                             </div>
                         )}
+                        {mensaje && (
+                            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                                {mensaje}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Contexto DUA — solo lectura */}
+                    {/* Contexto DUA */}
                     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Contexto DUA</p>
                         <div className="space-y-2 text-sm">
@@ -205,65 +230,67 @@ export default function ExtraerDatosFactura({ despacho, onVolver, onIrEditar }) 
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-bold text-gray-700">Vista Previa de Ítems</h2>
-                        <div className="flex items-center gap-2">
-                            {items.length > 0 && (
-                                <span className="px-2.5 py-1 bg-[#e0f7fa] text-[#008b9c] text-xs font-bold rounded-full">
-                                    {items.length} ítems
-                                </span>
-                            )}
-                            {/* Ícono descarga — CA3 */}
-                            <button
-                                onClick={handleDescargarPreview}
-                                disabled={items.length === 0}
-                                title="Descargar tabla en Excel"
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                    items.length === 0
-                                        ? 'text-gray-300 cursor-not-allowed'
-                                        : 'text-gray-400 hover:bg-[#e0f7fa] hover:text-[#008b9c]'
-                                }`}
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                            </button>
-                        </div>
+                        {items.length > 0 && (
+                            <span className="px-2.5 py-1 bg-[#e0f7fa] text-[#008b9c] text-xs font-bold rounded-full">
+                                {items.length} ítems
+                            </span>
+                        )}
                     </div>
 
                     {items.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-gray-300">
                             <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                            <p className="text-sm text-gray-400 text-center">No hay datos extraídos. Cargue un archivo y ejecute la extracción para visualizar la clasificación técnica de los ítems de la factura.</p>
+                            <p className="text-sm text-gray-400 text-center">No hay datos extraídos. Cargue un archivo y ejecute la extracción para visualizar los ítems.</p>
                         </div>
                     ) : (
                         <>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
+                                <table className="w-full text-xs text-left">
                                     <thead>
-                                        <tr className="border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">
-                                            <th className="pb-3 pr-3 text-right">Cantidad</th>
-                                            <th className="pb-3 pr-3">Descripción</th>
-                                            <th className="pb-3 pr-3 text-right">Valor</th>
-                                            <th className="pb-3 text-right">Peso</th>
+                                        <tr className="border-b border-gray-100 font-semibold text-gray-500 uppercase">
+                                            <th className="pb-2 pr-2 text-right">Cant.</th>
+                                            <th className="pb-2 pr-2">Descripción</th>
+                                            <th className="pb-2 pr-2">U.M.</th>
+                                            <th className="pb-2 pr-2 text-right">P. Unit.</th>
+                                            <th className="pb-2 pr-2">País</th>
+                                            <th className="pb-2 text-right">Costo Total</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
                                         {items.map((it, i) => (
                                             <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                                <td className="py-2.5 pr-3 text-right text-gray-600">{it.cantidad}</td>
-                                                <td className="py-2.5 pr-3 text-gray-800 font-medium max-w-[180px]">
+                                                <td className="py-2 pr-2 text-right text-gray-600">{it.cantidad}</td>
+                                                <td className="py-2 pr-2 text-gray-800 font-medium max-w-[120px]">
                                                     <p className="truncate">{it.descripcion}</p>
                                                 </td>
-                                                <td className="py-2.5 pr-3 text-right text-gray-600">{it.valor}</td>
-                                                <td className="py-2.5 text-right text-gray-600">{it.peso}</td>
+                                                <td className="py-2 pr-2 text-gray-500">{it.unidadMedida || '—'}</td>
+                                                <td className="py-2 pr-2 text-right text-gray-600">{fmt(it.precioUnitario)}</td>
+                                                <td className="py-2 pr-2 text-gray-500">{it.paisOrigen || '—'}</td>
+                                                <td className="py-2 text-right font-semibold text-gray-700">{fmt(it.costoTotal)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
+                                    <tfoot>
+                                        <tr className="border-t border-gray-200">
+                                            <td colSpan={5} className="pt-2 text-xs font-semibold text-gray-500 text-right pr-2">Total Costo:</td>
+                                            <td className="pt-2 text-right text-sm font-bold text-[#1a2540]">
+                                                {fmt(items.reduce((s, it) => s + Number(it.costoTotal), 0))}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                             <div className="mt-4 pt-4 border-t border-gray-100">
                                 <button
-                                    onClick={() => onIrEditar(items)}
-                                    className="w-full py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#0f1a30] transition-colors"
+                                    onClick={handleConfirmar}
+                                    disabled={guardando}
+                                    className={`w-full py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                                        guardando
+                                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                            : 'bg-[#1a2540] text-white hover:bg-[#0f1a30]'
+                                    }`}
                                 >
-                                    Editar →
+                                    {guardando ? 'Guardando...' : 'CONFIRMAR EXTRACCIÓN'}
                                 </button>
                             </div>
                         </>

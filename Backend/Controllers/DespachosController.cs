@@ -139,6 +139,23 @@ namespace LogisticaBroker.Controllers
             });
         }
 
+        // PATCH: api/Despachos/{id}/estado — actualiza el estado del despacho (HU12)
+        [HttpPatch("{id}/estado")]
+        public async Task<IActionResult> ActualizarEstado(int id, [FromBody] ActualizarEstadoDto dto)
+        {
+            var despacho = await _despachoRepository.GetByIdAsync(id);
+            if (despacho == null)
+                return NotFound(new { mensaje = "Despacho no encontrado." });
+
+            if (string.IsNullOrWhiteSpace(dto.Estado))
+                return BadRequest(new { mensaje = "El estado no puede estar vacío." });
+
+            despacho.Estado = dto.Estado;
+            await _unitOfWork.SaveChangesAsync();
+
+            return Ok(new { mensaje = $"Estado actualizado a '{dto.Estado}'.", estado = despacho.Estado });
+        }
+
         // DELETE: api/Despachos/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> EliminarDespacho(int id)
@@ -155,5 +172,10 @@ namespace LogisticaBroker.Controllers
 
             return Ok(new { mensaje = $"Despacho {despacho.CodigoOrden} eliminado correctamente." });
         }
+    }
+
+    public class ActualizarEstadoDto
+    {
+        public string Estado { get; set; } = null!;
     }
 }

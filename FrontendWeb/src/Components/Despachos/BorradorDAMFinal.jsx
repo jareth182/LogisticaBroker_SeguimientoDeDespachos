@@ -1,61 +1,138 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 
+const API_ITEMS    = 'http://localhost:5018/api/ItemsFactura';
+const API_DESPACHO = 'http://localhost:5018/api/Despachos';
+
 export default function BorradorDAMFinal({ despacho, onVolver, onGenerado }) {
-    const [confirmado, setConfirmado] = useState(false);
-    const [generando, setGenerando]   = useState(false);
-    const [generado, setGenerado]     = useState(despacho.estado === 'Borrador Finalizado');
-    const [error, setError]           = useState(null);
-    const [errorExportar, setErrorExportar] = useState(null);
+    const [items, setItems]                   = useState([]);
+    const [cargandoItems, setCargandoItems]   = useState(true);
+    const [excelDescargado, setExcelDescargado] = useState(false);
+    const [guardando, setGuardando]           = useState(false);
+    const [generado, setGenerado]             = useState(despacho.estado === 'Borrador Finalizado');
+    const [error, setError]                   = useState(null);
+    const [errorExcel, setErrorExcel]         = useState(null);
 
-    // Valores simulados — en producción vendrían del despacho
-    const totalItems   = despacho.totalItems   ?? 12;
-    const pesoBruto    = despacho.pesoBruto    ?? 3840.50;
-    const valorCIF     = despacho.valorCIF     ?? 128450.00;
-    const valorFOB     = despacho.valorFOB     ?? 121000.00;
-    const flete        = despacho.flete        ?? 5500.00;
-    const seguro       = despacho.seguro       ?? 1950.00;
-
-    // Cálculo de tributos — CA1
+    const valorCIF  = despacho.valorCIF  ?? 128450.00;
+    const valorFOB  = despacho.valorFOB  ?? 121000.00;
+    const flete     = despacho.flete     ?? 5500.00;
+    const seguro    = despacho.seguro    ?? 1950.00;
     const adValorem = valorCIF * 0.06;
     const igv       = (valorCIF + adValorem) * 0.16;
     const ipm       = (valorCIF + adValorem) * 0.02;
     const total     = adValorem + igv + ipm;
 
-    const fmt = (n) => n.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmt = (n) => Number(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const yaGenerado = despacho.estado === 'Borrador Finalizado';
+    useEffect(() => {
+        fetch(`${API_ITEMS}/${despacho.idDespacho}`)
+            .then(r => r.json())
+            .then(data => setItems(Array.isArray(data) ? data : []))
+            .catch(() => setItems([]))
+            .finally(() => setCargandoItems(false));
+    }, [despacho.idDespacho]);
 
-    const handleGenerar = () => {
-        if (!confirmado || yaGenerado) return;
-        setGenerando(true); setError(null);
-        setTimeout(() => {
-            try {
-                setGenerado(true);
-                setGenerando(false);
-                onGenerado?.('Borrador Finalizado');
-            } catch {
-                setError('Error al generar el borrador. Intenta nuevamente');
-                setGenerando(false);
-            }
-        }, 1200);
+    const handleDescargarExcel = () => {
+        setErrorExcel(null);
+        try {
+            const wb = XLSX.utils.book_new();
+
+            // ── Hoja 1: Cabecera del expediente ──
+            const cabeceraData = [
+                ['Matriz de Liquidación (Anexo B)'],
+                [],
+                ['Expediente',   despacho.codigoOrden ?? ''],
+                ['Operación',    despacho.codigoBl    ?? ''],
+                ['HUC',          despacho.codigoBl    ?? ''],
+                ['Fecha',        new Date().toLocaleDateString('es-PE')],
+                ['Moneda',       'USD'],
+                ['Cliente',      despacho.razonSocial ?? ''],
+                [],
+                ['VALORES FOB/CIF/FLETE/SEGURO'],
+                ['Concepto',        'Monto (USD)'],
+                ['FOB',             fmt(valorFOB)],
+                ['Flete',           fmt(flete)],
+                ['Seguro',          fmt(seguro)],
+                ['CIF',             fmt(valorCIF)],
+                [],
+                ['TRIBUTOS ADUANEROS'],
+                ['Concepto',        'Monto (USD)'],
+                ['Ad Valorem (6%)', fmt(adValorem)],
+                ['IGV (16%)',       fmt(igv)],
+                ['IPM (2%)',        fmt(ipm)],
+                ['Total Tributos',  fmt(total)],
+            ];
+            const wsCabecera = XLSX.utils.aoa_to_sheet(cabeceraData);
+            wsCabecera['!cols'] = [{ wch: 28 }, { wch: 20 }];
+            XLSX.utils.book_append_sheet(wb, wsCabecera, 'Expediente');
+
+            // ── Hoja 2: Detalle de ítems ──
+            const itemsHeader = [
+                ['#', 'Descripción', 'Partida Aranc.', 'País Origen', 'U.M.', 'Cantidad', 'Precio Unit.', 'Costo Total', 'N° Cajas', 'Volumen (m³)', 'Peso Bruto (KG)', 'Peso Neto (KG)']
+            ];
+            const itemsRows = items.map((it, i) => {
+                const c = Number(it.cantidad) || 0;
+                const p = Number(it.valor) || 0;
+                return [
+                    i + 1,
+                    it.descripcion ?? '',
+                    it.partidaArancelaria ?? '',
+                    it.paisOrigen ?? '',
+                    it.unidadMedida ?? '',
+                    c,
+                    p,
+                    c * p,
+                    it.numCajas ?? '',
+                    it.volumen ?? '',
+                    it.pesoBruto ?? '',
+                    it.pesoNeto ?? '',
+                ];
+            });
+            const totalesRow = [
+                '', 'TOTALES', '', '', '',
+                items.reduce((s, it) => s + (Number(it.cantidad) || 0), 0),
+                '',
+                items.reduce((s, it) => s + ((Number(it.cantidad) || 0) * (Number(it.valor) || 0)), 0),
+                items.reduce((s, it) => s + (Number(it.numCajas) || 0), 0),
+                items.reduce((s, it) => s + (Number(it.volumen)  || 0), 0),
+                items.reduce((s, it) => s + (Number(it.pesoBruto)|| 0), 0),
+                items.reduce((s, it) => s + (Number(it.pesoNeto) || 0), 0),
+            ];
+            const wsItems = XLSX.utils.aoa_to_sheet([...itemsHeader, ...itemsRows, totalesRow]);
+            wsItems['!cols'] = [
+                { wch: 4 }, { wch: 36 }, { wch: 14 }, { wch: 14 }, { wch: 6 },
+                { wch: 10 }, { wch: 12 }, { wch: 13 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 14 }
+            ];
+            XLSX.utils.book_append_sheet(wb, wsItems, 'Detalle Ítems');
+
+            XLSX.writeFile(wb, 'Matriz de Liquidación (Anexo B).xlsx');
+            setExcelDescargado(true);
+        } catch {
+            setErrorExcel('Error al generar el archivo Excel. Intenta nuevamente');
+        }
     };
 
-    // Exportar tributos a Excel — CA3
-    const handleExportar = () => {
-        setErrorExportar(null);
+    const handleGuardar = async () => {
+        if (!excelDescargado || guardando) return;
+        setGuardando(true);
+        setError(null);
         try {
-            const ws = XLSX.utils.json_to_sheet([
-                { Concepto: 'Ad Valorem', 'Base Imponible (USD)': fmt(valorCIF),             Tasa: '6%',  'Total a Pagar (USD)': fmt(adValorem) },
-                { Concepto: 'IGV',        'Base Imponible (USD)': fmt(valorCIF + adValorem), Tasa: '16%', 'Total a Pagar (USD)': fmt(igv) },
-                { Concepto: 'IPM',        'Base Imponible (USD)': fmt(valorCIF + adValorem), Tasa: '2%',  'Total a Pagar (USD)': fmt(ipm) },
-                { Concepto: 'Total Estimado', 'Base Imponible (USD)': '',                    Tasa: '',    'Total a Pagar (USD)': fmt(total) },
-            ]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Tributos');
-            XLSX.writeFile(wb, `tributos_${despacho.codigoOrden}.xlsx`);
+            const res = await fetch(`${API_DESPACHO}/${despacho.idDespacho}/estado`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: 'Borrador Finalizado' })
+            });
+            if (!res.ok) {
+                const d = await res.json();
+                setError(d.mensaje || 'Error al guardar el borrador.');
+                return;
+            }
+            setGenerado(true);
+            onGenerado?.('Borrador Finalizado');
         } catch {
-            setErrorExportar('Error al exportar los tributos. Intenta nuevamente');
+            setError('Error al conectar con el servidor. Intenta nuevamente');
+        } finally {
+            setGuardando(false);
         }
     };
 
@@ -80,136 +157,92 @@ export default function BorradorDAMFinal({ despacho, onVolver, onGenerado }) {
         );
     }
 
+    const yaGenerado = despacho.estado === 'Borrador Finalizado';
+
     return (
         <div className="max-w-4xl mx-auto">
-            {/* Enlace volver — siempre habilitado */}
             <button onClick={onVolver} className="flex items-center gap-1.5 text-sm text-gray-500 mb-4 hover:text-[#008b9c] transition-colors">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                ← Volver a Operaciones
+                ← Volver
             </button>
 
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Generar Borrador DAM</h1>
             <p className="text-sm text-gray-500 mb-6">
-                Revise los totales financieros antes de generar el borrador de la Declaración Aduanera de Mercancías (DAM).
+                Despacho: <span className="font-semibold font-mono">{despacho.codigoBl}</span>
             </p>
 
-            {/* CA2.3: borrador ya generado */}
             {yaGenerado && (
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-800 mb-4">
                     El borrador ya fue generado para este despacho
                 </div>
             )}
 
-            {/* Error generar — CA2.2 */}
             {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 mb-4">
                     {error}
                 </div>
             )}
 
-            {/* 3 Tarjetas resumen — CA1 */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Total Ítems Procesados</p>
-                    <p className="text-4xl font-bold text-[#1a2540]">{totalItems}</p>
-                    <p className="text-xs text-green-600 font-semibold mt-2">✓ 100% Clasificados</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Peso Bruto Total</p>
-                    <p className="text-4xl font-bold text-[#1a2540]">{fmt(pesoBruto)}</p>
-                    <p className="text-xs text-gray-400 mt-2">kg · B/L: {despacho.codigoBl}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Valor CIF Total</p>
-                    <p className="text-4xl font-bold text-[#1a2540]">${fmt(valorCIF)}</p>
-                    <p className="text-xs text-gray-400 mt-2">FOB ${fmt(valorFOB)} · Flete ${fmt(flete)} · Seg. ${fmt(seguro)}</p>
-                </div>
-            </div>
+            {/* Paso 1: Descargar Excel */}
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-4">
+                <h2 className="text-sm font-bold text-gray-700 mb-1">Paso 1 — Descargar la Matriz de Liquidación</h2>
+                <p className="text-sm text-gray-500 mb-3">
+                    El archivo incluye la cabecera del expediente, los tributos aduaneros y el detalle completo de
+                    {cargandoItems ? ' ...' : ` ${items.length} ítems`}.
+                </p>
 
-            {/* Desglose de Tributos Estimados — CA1 + CA3 */}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm mb-6">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                    <h2 className="text-sm font-bold text-gray-700">Desglose de Tributos Estimados</h2>
-                    {/* Botón Exportar — CA3 */}
-                    <button
-                        onClick={handleExportar}
-                        className="flex items-center gap-1.5 text-sm font-semibold text-[#008b9c] hover:text-[#007685] border border-[#008b9c] px-3 py-1.5 rounded-lg hover:bg-[#e0f7fa] transition-colors"
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                        Exportar
-                    </button>
-                </div>
-                {/* CA3.1: error exportar */}
-                {errorExportar && (
-                    <div className="px-5 pb-3 text-sm text-red-700">
-                        {errorExportar}
+                {errorExcel && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-3">
+                        {errorExcel}
                     </div>
                 )}
-                <table className="w-full text-sm text-left">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">
-                            <th className="px-5 py-3">Concepto</th>
-                            <th className="px-5 py-3 text-right">Base Imponible (USD)</th>
-                            <th className="px-5 py-3 text-right">Tasa</th>
-                            <th className="px-5 py-3 text-right">Total a Pagar (USD)</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                        <tr>
-                            <td className="px-5 py-3 text-gray-700 font-medium">Ad Valorem</td>
-                            <td className="px-5 py-3 text-right text-gray-600">${fmt(valorCIF)}</td>
-                            <td className="px-5 py-3 text-right text-gray-600">6%</td>
-                            <td className="px-5 py-3 text-right font-semibold text-gray-800">${fmt(adValorem)}</td>
-                        </tr>
-                        <tr>
-                            <td className="px-5 py-3 text-gray-700 font-medium">IGV</td>
-                            <td className="px-5 py-3 text-right text-gray-600">${fmt(valorCIF + adValorem)}</td>
-                            <td className="px-5 py-3 text-right text-gray-600">16%</td>
-                            <td className="px-5 py-3 text-right font-semibold text-gray-800">${fmt(igv)}</td>
-                        </tr>
-                        <tr>
-                            <td className="px-5 py-3 text-gray-700 font-medium">IPM</td>
-                            <td className="px-5 py-3 text-right text-gray-600">${fmt(valorCIF + adValorem)}</td>
-                            <td className="px-5 py-3 text-right text-gray-600">2%</td>
-                            <td className="px-5 py-3 text-right font-semibold text-gray-800">${fmt(ipm)}</td>
-                        </tr>
-                        <tr className="bg-[#f0fbfc] font-bold">
-                            <td className="px-5 py-3 text-[#1a2540]" colSpan={3}>Total Estimado</td>
-                            <td className="px-5 py-3 text-right text-[#1a2540] text-base">${fmt(total)}</td>
-                        </tr>
-                    </tbody>
-                </table>
+
+                <button
+                    onClick={handleDescargarExcel}
+                    disabled={cargandoItems}
+                    className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                        cargandoItems
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-[#008b9c] text-white hover:bg-[#007685]'
+                    }`}
+                >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    DESCARGAR EXCEL
+                </button>
+
+                {excelDescargado && (
+                    <p className="text-xs text-green-600 mt-2 font-semibold">
+                        ✓ Archivo descargado: Matriz de Liquidación (Anexo B).xlsx
+                    </p>
+                )}
             </div>
 
-            {/* Checkbox y botón — CA2 */}
+            {/* Paso 2: Guardar */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-                <label className="flex items-start gap-3 cursor-pointer mb-5">
-                    <input
-                        type="checkbox"
-                        checked={confirmado}
-                        onChange={e => setConfirmado(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-gray-300 text-[#008b9c] focus:ring-[#008b9c]"
-                    />
-                    <span className="text-sm text-gray-700">
-                        Confirmo que los datos resumidos son correctos. La generación del borrador congelará estos valores para la revisión pre-transmisión a SUNAT.
-                    </span>
-                </label>
+                <h2 className="text-sm font-bold text-gray-700 mb-1">Paso 2 — Confirmar y guardar el borrador</h2>
+                <p className="text-sm text-gray-500 mb-4">
+                    Una vez descargada la Matriz de Liquidación, confirma la generación del borrador DAM. El estado del despacho cambiará a <strong>Borrador Finalizado</strong>.
+                </p>
 
                 <div className="flex justify-end">
                     <button
-                        onClick={handleGenerar}
-                        disabled={!confirmado || generando || yaGenerado}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-colors ${
-                            !confirmado || generando || yaGenerado
+                        onClick={handleGuardar}
+                        disabled={!excelDescargado || guardando || yaGenerado}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-colors shadow-sm ${
+                            !excelDescargado || guardando || yaGenerado
                                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50'
-                                : 'bg-[#008b9c] text-white hover:bg-[#007685] shadow-sm'
+                                : 'bg-[#1a2540] text-white hover:bg-[#0f1a30]'
                         }`}
                     >
-                        {generando ? (
-                            <><svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Generando...</>
-                        ) : (
-                            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Generar Borrador</>
-                        )}
+                        {guardando ? (
+                            <>
+                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                </svg>
+                                Guardando...
+                            </>
+                        ) : 'GUARDAR'}
                     </button>
                 </div>
             </div>

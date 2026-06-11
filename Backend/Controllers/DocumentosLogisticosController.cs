@@ -51,14 +51,14 @@ public class DocumentosLogisticosController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.TipoDocumento)) // PA HU09-2.3 NOK — tipo de documento no seleccionado
             return BadRequest(new { mensaje = "Debe seleccionar el tipo de documento antes de subir el archivo." });
 
-        const long maxBytes = 10 * 1024 * 1024; // 10 MB
-        if (request.Archivo.Length > maxBytes) // PA HU09-2.1 NOK — archivo supera el límite de 10 MB
-            return BadRequest(new { mensaje = "El archivo supera el límite permitido de 10 MB. Comprima o reduzca el tamaño antes de subirlo." });
+        const long maxBytes = 5 * 1024 * 1024; // 5 MB
+        if (request.Archivo.Length > maxBytes) // PA HU09-2.1 NOK — archivo supera el límite de 5 MB
+            return BadRequest(new { mensaje = "El archivo supera el límite permitido de 5 MB. Comprima o reduzca el tamaño antes de subirlo." });
 
         var extension = Path.GetExtension(request.Archivo.FileName).ToLowerInvariant();
-        var permitidos = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".xls", ".xlsx" };
+        var permitidos = new[] { ".pdf", ".jpg", ".jpeg" };
         if (!permitidos.Contains(extension)) // PA HU09-2.2 NOK — formato de archivo no permitido
-            return BadRequest(new { mensaje = "Formato no admitido. Solo se permiten archivos PDF, JPG, PNG o Excel." });
+            return BadRequest(new { mensaje = "Formato no admitido. Solo se permiten archivos PDF o JPG." });
 
         // Simular URL de almacenamiento (consistente con CloudStorageService)
         var nombreArchivo = request.Archivo.FileName;
@@ -89,7 +89,7 @@ public class DocumentosLogisticosController : ControllerBase
             doc.RutaArchivo,
             doc.TamanoBytes,
             doc.FechaCarga,
-            mensaje = "Archivo asociado exitosamente al despacho."
+            mensaje = "Documento guardado correctamente. El documento se encuentra con estado 'En revisión'."
         });
     }
 

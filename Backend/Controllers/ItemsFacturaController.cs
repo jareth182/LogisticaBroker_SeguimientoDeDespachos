@@ -30,6 +30,12 @@ public class ItemsFacturaController : ControllerBase
                 i.Cantidad,
                 i.Valor,
                 i.Peso,
+                i.UnidadMedida,
+                i.PaisOrigen,
+                i.NumCajas,
+                i.Volumen,
+                i.PesoBruto,
+                i.PesoNeto,
                 i.PartidaArancelaria,
                 i.TieneRestriccion,
                 i.FechaModificacion,
@@ -41,19 +47,13 @@ public class ItemsFacturaController : ControllerBase
     }
 
     // POST /api/ItemsFactura/{idDespacho}/guardar
-    // Guarda (reemplaza) todos los ítems de un despacho desde HU10
+    // Agrega ítems extraídos de la factura al despacho (sin eliminar los existentes — HU10)
     [HttpPost("{idDespacho}/guardar")]
     public async Task<IActionResult> GuardarItems(int idDespacho, [FromBody] List<GuardarItemDto> items)
     {
         var despacho = await _context.Despachos.FindAsync(idDespacho);
         if (despacho is null)
             return NotFound(new { mensaje = "Despacho no encontrado." });
-
-        // Eliminar ítems anteriores del despacho (reemplaza toda la extracción)
-        var anteriores = await _context.ItemsFactura
-            .Where(i => i.IdDespacho == idDespacho)
-            .ToListAsync();
-        _context.ItemsFactura.RemoveRange(anteriores);
 
         foreach (var dto in items)
         {
@@ -63,7 +63,8 @@ public class ItemsFacturaController : ControllerBase
                 Descripcion  = dto.Descripcion,
                 Cantidad     = dto.Cantidad,
                 Valor        = dto.Valor,
-                Peso         = dto.Peso,
+                UnidadMedida = dto.UnidadMedida,
+                PaisOrigen   = dto.PaisOrigen,
                 TieneRestriccion = false
             });
         }
@@ -73,7 +74,7 @@ public class ItemsFacturaController : ControllerBase
     }
 
     // PUT /api/ItemsFactura/{idItem}
-    // Actualiza partida arancelaria y restricciones de un ítem (HU11)
+    // Actualiza todos los campos editables de un ítem (HU11)
     [HttpPut("{idItem}")]
     public async Task<IActionResult> ActualizarItem(int idItem, [FromBody] ActualizarItemDto dto)
     {
@@ -84,23 +85,43 @@ public class ItemsFacturaController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.PartidaArancelaria)) // PA HU11-2.1 NOK — campo de partida arancelaria vacío
             return BadRequest(new { mensaje = "El campo de partida arancelaria es obligatorio." });
 
-        if (dto.TieneRestriccion && string.IsNullOrWhiteSpace(dto.PartidaArancelaria)) // PA HU11-3.1 NOK — restricción marcada sin partida (dead branch: capturado arriba)
-            return BadRequest(new { mensaje = "Debe completar la partida arancelaria antes de registrar restricciones técnicas." });
-
-        if (!System.Text.RegularExpressions.Regex.IsMatch(dto.PartidaArancelaria, @"^\d{10}$")) // PA HU11-2.2 NOK — formato inválido (no son 10 dígitos numéricos)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(dto.PartidaArancelaria, @"^\d{10}$")) // PA HU11-2.2 NOK — formato inválido
             return BadRequest(new { mensaje = "La partida arancelaria debe contener únicamente caracteres numéricos con el formato oficial del arancel de aduanas." });
+
+        if (dto.Cantidad.HasValue && dto.Cantidad.Value <= 0)
+            return BadRequest(new { mensaje = "La cantidad debe ser mayor a 0." });
+
+        if (dto.Valor.HasValue && dto.Valor.Value <= 0)
+            return BadRequest(new { mensaje = "El precio unitario debe ser un valor positivo." });
 
         item.PartidaArancelaria  = dto.PartidaArancelaria;
         item.TieneRestriccion    = dto.TieneRestriccion;
+        if (!string.IsNullOrWhiteSpace(dto.Descripcion))   item.Descripcion  = dto.Descripcion;
+        if (dto.Cantidad.HasValue)    item.Cantidad     = dto.Cantidad.Value;
+        if (dto.Valor.HasValue)       item.Valor        = dto.Valor.Value;
+        if (dto.UnidadMedida != null) item.UnidadMedida = dto.UnidadMedida;
+        if (dto.PaisOrigen   != null) item.PaisOrigen   = dto.PaisOrigen;
+        if (dto.NumCajas.HasValue)    item.NumCajas     = dto.NumCajas;
+        if (dto.Volumen.HasValue)     item.Volumen      = dto.Volumen;
+        if (dto.PesoBruto.HasValue)   item.PesoBruto    = dto.PesoBruto;
+        if (dto.PesoNeto.HasValue)    item.PesoNeto     = dto.PesoNeto;
         item.FechaModificacion   = DateTime.UtcNow;
         item.UsuarioModificacion = dto.UsuarioModificacion;
 
         await _context.SaveChangesAsync();
 
-        return Ok(new // PA HU11-2 OK — partida arancelaria guardada; PA HU11-3 OK — con indicador de restricción técnica
+        return Ok(new // PA HU11-2 OK
         {
             item.IdItem,
             item.Descripcion,
+            item.Cantidad,
+            item.Valor,
+            item.UnidadMedida,
+            item.PaisOrigen,
+            item.NumCajas,
+            item.Volumen,
+            item.PesoBruto,
+            item.PesoNeto,
             item.PartidaArancelaria,
             item.TieneRestriccion,
             item.FechaModificacion,
@@ -114,12 +135,22 @@ public class GuardarItemDto
     public string Descripcion { get; set; } = null!;
     public decimal Cantidad { get; set; }
     public decimal Valor { get; set; }
-    public decimal Peso { get; set; }
+    public string? UnidadMedida { get; set; }
+    public string? PaisOrigen { get; set; }
 }
 
 public class ActualizarItemDto
 {
     public string? PartidaArancelaria { get; set; }
+    public string? Descripcion { get; set; }
+    public decimal? Cantidad { get; set; }
+    public decimal? Valor { get; set; }
+    public string? UnidadMedida { get; set; }
+    public string? PaisOrigen { get; set; }
+    public decimal? NumCajas { get; set; }
+    public decimal? Volumen { get; set; }
+    public decimal? PesoBruto { get; set; }
+    public decimal? PesoNeto { get; set; }
     public bool TieneRestriccion { get; set; }
     public string? UsuarioModificacion { get; set; }
 }

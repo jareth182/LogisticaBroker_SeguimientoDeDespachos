@@ -8,6 +8,12 @@ public class ItemFactura
     public decimal Cantidad { get; set; }
     public decimal Valor { get; set; }
     public decimal Peso { get; set; }
+    public string? UnidadMedida { get; set; }
+    public string? PaisOrigen { get; set; }
+    public decimal? NumCajas { get; set; }
+    public decimal? Volumen { get; set; }
+    public decimal? PesoBruto { get; set; }
+    public decimal? PesoNeto { get; set; }
     public string? PartidaArancelaria { get; set; }
     public bool TieneRestriccion { get; set; } = false;
     public DateTime? FechaModificacion { get; set; }

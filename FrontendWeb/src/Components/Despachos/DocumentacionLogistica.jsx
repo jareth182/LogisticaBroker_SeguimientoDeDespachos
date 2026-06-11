@@ -55,10 +55,10 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
     const validarArchivo = (file) => {
         if (!file) return null;
         const ext = file.name.split('.').pop().toLowerCase();
-        if (!['pdf', 'jpg', 'jpeg', 'png', 'xls', 'xlsx'].includes(ext))
-            return 'El formato del archivo no es válido. Solo se aceptan PDF, JPG, PNG y Excel';
-        if (file.size > 10 * 1024 * 1024)
-            return 'El archivo supera el tamaño máximo permitido de 10 MB';
+        if (!['pdf', 'jpg', 'jpeg'].includes(ext))
+            return 'El formato del archivo no es válido. Solo se aceptan PDF y JPG';
+        if (file.size > 5 * 1024 * 1024)
+            return 'El archivo supera el tamaño máximo permitido de 5 MB';
         return null;
     };
 
@@ -97,7 +97,7 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
             const res = await fetch(`${API}/${despacho.idDespacho}/subir`, { method: 'POST', body: form });
             const data = await res.json();
             if (res.ok) { // PA HU09-2 OK — archivo subido y asociado al despacho
-                setMensaje({ tipo: 'exito', texto: 'Archivo asociado exitosamente al despacho.' });
+                setMensaje({ tipo: 'exito', texto: "Documento guardado correctamente. El documento se encuentra con estado 'En revisión'." });
                 setArchivo(null); setTipo('');
                 if (inputRef.current) inputRef.current.value = '';
                 cargar();
@@ -107,34 +107,6 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
         } catch {
             setMensaje({ tipo: 'error', texto: 'Error al subir el archivo. Intenta nuevamente' });
         } finally { setSubiendo(false); }
-    };
-
-    const handleEliminar = async (doc) => {
-        if (!window.confirm(`¿Eliminar "${doc.nombreArchivo}"?`)) return;
-        try {
-            const res = await fetch(`${API}/${doc.idDocumentoLogistico}`, { method: 'DELETE' });
-            if (res.ok) {
-                setDocs(prev => prev.filter(d => d.idDocumentoLogistico !== doc.idDocumentoLogistico));
-            } else {
-                setMensaje({ tipo: 'error', texto: 'Error al eliminar el archivo. Intenta nuevamente' });
-            }
-        } catch {
-            setMensaje({ tipo: 'error', texto: 'Error al eliminar el archivo. Intenta nuevamente' });
-        }
-    };
-
-    const handleDescargar = async (doc) => {
-        try {
-            const res = await fetch(`${API}/descargar/${doc.idDocumentoLogistico}`);
-            if (res.ok) {
-                const data = await res.json();
-                window.open(data.rutaArchivo, '_blank');
-            } else {
-                setMensaje({ tipo: 'error', texto: 'No se pudo descargar el archivo. Intenta nuevamente' });
-            }
-        } catch {
-            setMensaje({ tipo: 'error', texto: 'No se pudo descargar el archivo. Intenta nuevamente' });
-        }
     };
 
     return (
@@ -222,7 +194,7 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                         <input
                             ref={inputRef}
                             type="file"
-                            accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx"
+                            accept=".pdf,.jpg,.jpeg"
                             className="hidden"
                             onChange={e => onFileChange(e.target.files[0])}
                         />
@@ -237,7 +209,7 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                                 <svg className="w-10 h-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                                 <p className="text-sm font-semibold text-gray-600">Arrastra y suelta tus archivos aquí</p>
                                 <p className="text-xs text-gray-400 mt-1">o haz clic para explorar en tu dispositivo</p>
-                                <p className="text-xs text-gray-400 mt-1">Soporta PDF, XML, JPG, PNG (Max. 10MB)</p>
+                                <p className="text-xs text-gray-400 mt-1">PDF, JPG (Máx. 5MB)</p>
                             </>
                         )}
                     </div>
@@ -262,14 +234,14 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                                 : 'bg-[#1a2540] hover:bg-[#0f1a30]'
                         }`}
                     >
-                        {subiendo ? 'Subiendo...' : 'Subir Documentos'}
+                        {subiendo ? 'Subiendo...' : 'GUARDAR'}
                     </button>
                 </div>
 
                 {/* ── Panel derecho: lista ── */}
                 <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-base font-bold text-gray-800">Archivos Adjuntos</h2>
+                        <h2 className="text-base font-bold text-gray-800">Documentos del expediente</h2>
                         <span className="px-2.5 py-1 bg-[#e0f7fa] text-[#008b9c] text-xs font-bold rounded-full">
                             {docs.length} {docs.length === 1 ? 'Archivo' : 'Archivos'}
                         </span>
@@ -299,20 +271,7 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                                                 {doc.tipoDocumento} · {formatBytes(doc.tamanoBytes)} · {formatFecha(doc.fechaCarga)}
                                             </p>
                                         </div>
-                                        <button
-                                            onClick={() => handleDescargar(doc)}
-                                            title="Descargar"
-                                            className="p-1.5 rounded-lg hover:bg-[#e0f7fa] text-gray-400 hover:text-[#008b9c] transition-colors"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                        </button>
-                                        <button
-                                            onClick={() => handleEliminar(doc)}
-                                            title="Eliminar"
-                                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        </button>
+                                        <span className="px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full shrink-0">En revisión</span>
                                     </div>
                                 );
                             })}
