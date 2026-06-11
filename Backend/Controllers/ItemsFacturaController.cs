@@ -55,6 +55,11 @@ public class ItemsFacturaController : ControllerBase
         if (despacho is null)
             return NotFound(new { mensaje = "Despacho no encontrado." });
 
+        var existentes = await _context.ItemsFactura
+            .Where(i => i.IdDespacho == idDespacho)
+            .ToListAsync();
+        _context.ItemsFactura.RemoveRange(existentes);
+
         foreach (var dto in items)
         {
             _context.ItemsFactura.Add(new ItemFactura

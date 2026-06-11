@@ -50,23 +50,122 @@ export default function Documentos({ onNavigate }) {
 
     const handleDescargar = async (documento) => {
         try {
-            const response = await fetch(`${API_BASE_URL}${documento.urlDescarga}`);
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${documento.nombre.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-            }
-        } catch (error) {
-            setMensaje({
-                tipo: 'error',
-                texto: 'Error al descargar el documento.'
+            const token = localStorage.getItem('token') || '';
+            const response = await fetch(`${API_BASE_URL}/contrato/${documento.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
             });
+            if (!response.ok) throw new Error('No se pudo obtener el contrato');
+            const data = await response.json();
+
+            const userData = JSON.parse(localStorage.getItem('usuario') || '{}');
+            const firmante = userData.nombreCompleto || data.nombreContacto || 'Representante Legal';
+            const fechaFirma = data.fechaFirma
+                ? new Date(data.fechaFirma).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
+                : new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+            const numeroContrato = data.numeroContrato || `CTR-${documento.id}`;
+            const empresa = data.nombreEmpresa || '';
+
+            const firmaImg = data.firmaDigital && data.firmaDigital.startsWith('data:image')
+                ? `<img src="${data.firmaDigital}" style="height:64px;max-width:220px;border:1px solid #ccc;border-radius:4px;background:#fff;" />`
+                : '<div style="height:64px;display:flex;align-items:center;justify-content:center;color:#aaa;font-style:italic;font-size:10pt;">[Firma no disponible]</div>';
+
+            const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Contrato de Servicios Aduaneros</title>
+<style>
+  body{font-family:"Times New Roman",serif;font-size:11pt;max-width:820px;margin:30px auto;padding:0 50px;color:#111;line-height:1.6}
+  h1{font-size:13pt;text-align:center;text-transform:uppercase;letter-spacing:1px;margin:0 0 4px}
+  .subtitle{text-align:center;font-size:9.5pt;color:#555;margin-bottom:28px}
+  h2{font-size:10pt;text-transform:uppercase;letter-spacing:.8px;margin:18px 0 6px;border-bottom:1px solid #ddd;padding-bottom:3px}
+  p,li{margin:5px 0}
+  ol{padding-left:22px}
+  .firma-section{margin-top:40px;padding-top:20px;border-top:2px solid #1a2540}
+  .firma-row{display:flex;justify-content:space-between;margin-top:28px;gap:40px}
+  .firma-block{flex:1;text-align:center}
+  .firma-line{height:1px;background:#111;margin:30px 0 6px}
+  .firma-name{font-size:9.5pt;font-weight:bold;margin:2px 0}
+  .firma-cargo{font-size:9pt;color:#555}
+  .sello{display:inline-block;border:2px solid #1a2540;color:#1a2540;padding:5px 16px;font-size:9pt;font-weight:bold;letter-spacing:2px;margin-top:24px;text-transform:uppercase}
+  @media print{body{margin:10px}}
+</style>
+</head>
+<body>
+<p style="text-align:center;font-size:9pt;color:#888;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Logística Broker Perú S.A.C.</p>
+<h1>Contrato de Prestación de Servicios Aduaneros</h1>
+<p class="subtitle">Documento Nº ${numeroContrato}</p>
+
+<h2>Partes Contratantes</h2>
+<p>De una parte, <strong>LOGÍSTICA BROKER PERÚ S.A.C.</strong>, con RUC N° 20123456789, domicilio en Av. Mariscal La Mar 555, Miraflores, Lima, Perú, debidamente representada por su Gerente General, en adelante denominada <strong>"LA AGENCIA"</strong>.</p>
+<p>Y de otra parte, <strong>${empresa || 'EL CLIENTE'}</strong>, que al momento de la firma digital acredita su identidad mediante los documentos legales adjuntos al presente proceso de onboarding, en adelante denominada <strong>"EL CLIENTE"</strong>.</p>
+
+<h2>Cláusula Primera – Objeto del Contrato</h2>
+<p>LA AGENCIA se compromete a prestar servicios profesionales de agenciamiento aduanero, incluyendo gestión de despachos de importación y exportación, clasificación arancelaria, trámites ante la SUNAT y SENASA, así como trazabilidad en tiempo real de todos los procesos logísticos.</p>
+
+<h2>Cláusula Segunda – Obligaciones de la Agencia</h2>
+<ol>
+<li>Gestionar los despachos aduaneros dentro de los plazos establecidos por la normativa vigente.</li>
+<li>Proporcionar acceso al sistema de trazabilidad en línea con actualización en tiempo real.</li>
+<li>Mantener la confidencialidad absoluta de la información del cliente.</li>
+<li>Emitir liquidaciones detalladas de todos los gastos incurridos en cada despacho.</li>
+<li>Designar un ejecutivo de cuenta dedicado para atención personalizada.</li>
+</ol>
+
+<h2>Cláusula Tercera – Obligaciones del Cliente</h2>
+<ol>
+<li>Proporcionar la documentación requerida en los plazos acordados por las partes.</li>
+<li>Efectuar los pagos de honorarios y gastos en los términos pactados.</li>
+<li>Comunicar oportunamente cualquier modificación en la naturaleza de las mercancías.</li>
+<li>Mantener actualizados los poderes y documentos legales de representación.</li>
+</ol>
+
+<h2>Cláusula Cuarta – Honorarios y Condiciones de Pago</h2>
+<p>Los honorarios serán determinados en función del tipo de despacho, el valor de la mercancía y los servicios adicionales requeridos. Las liquidaciones se emitirán dentro de los 5 días hábiles posteriores al levante de la mercancía.</p>
+
+<h2>Cláusula Quinta – Plazo del Contrato</h2>
+<p>El presente contrato entrará en vigencia a partir de la fecha de su firma digital y tendrá una duración de doce (12) meses, renovándose automáticamente por períodos iguales salvo comunicación en contrario con 30 días de anticipación.</p>
+
+<h2>Cláusula Sexta – Resolución del Contrato</h2>
+<p>Cualquiera de las partes podrá resolver el presente contrato mediante comunicación escrita con 30 días de anticipación, o de manera inmediata ante incumplimiento grave de las obligaciones establecidas.</p>
+
+<h2>Cláusula Sétima – Protección de Datos</h2>
+<p>EL CLIENTE autoriza el tratamiento de sus datos personales y empresariales exclusivamente para los fines relacionados con los servicios contratados, de conformidad con la Ley N° 29733 de Protección de Datos Personales y su reglamento.</p>
+
+<h2>Cláusula Octava – Jurisdicción</h2>
+<p>Para la resolución de cualquier controversia derivada del presente contrato, las partes se someten expresamente a la jurisdicción de los Juzgados y Tribunales de la ciudad de Lima, Perú.</p>
+
+<div class="firma-section">
+  <p><strong>En señal de conformidad, las partes suscriben el presente contrato en Lima, Perú, con fecha ${fechaFirma}.</strong></p>
+  <div class="firma-row">
+    <div class="firma-block">
+      <div class="firma-line"></div>
+      <p class="firma-name">LOGÍSTICA BROKER PERÚ S.A.C.</p>
+      <p class="firma-cargo">Gerente General</p>
+    </div>
+    <div class="firma-block">
+      <div style="display:flex;justify-content:center;margin-bottom:6px">${firmaImg}</div>
+      <div class="firma-line"></div>
+      <p class="firma-name">${firmante}</p>
+      <p class="firma-cargo">Representante Legal — EL CLIENTE</p>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:28px">
+    <span class="sello">✓ Firmado Digitalmente</span>
+    <p style="font-size:8.5pt;color:#888;margin-top:8px">Documento firmado digitalmente el ${fechaFirma} · Logística Broker Perú S.A.C.</p>
+  </div>
+</div>
+</body>
+</html>`;
+
+            const win = window.open('', '_blank');
+            if (!win) { setMensaje({ tipo: 'error', texto: 'Permite ventanas emergentes para descargar el documento.' }); return; }
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+            setTimeout(() => win.print(), 500);
+        } catch {
+            setMensaje({ tipo: 'error', texto: 'Error al generar el documento.' });
         }
     };
 
@@ -133,48 +232,6 @@ export default function Documentos({ onNavigate }) {
                         </div>
                     )}
 
-                    {/* Filtros */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-                        <div className="flex space-x-2">
-                            <button
-                                onClick={() => setFiltro('todos')}
-                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                    filtro === 'todos'
-                                        ? 'bg-[#00b4d8] text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                            >
-                                Todos
-                            </button>
-                            <button
-                                onClick={() => setFiltro('firmados')}
-                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                    filtro === 'firmados'
-                                        ? 'bg-[#00b4d8] text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                            >
-                                Firmados
-                            </button>
-                            <button
-                                onClick={() => setFiltro('pendientes')}
-                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                                    filtro === 'pendientes'
-                                        ? 'bg-[#00b4d8] text-white'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                            >
-                                Pendientes
-                            </button>
-                        </div>
-
-                        <div className="flex items-center space-x-2 text-sm text-gray-600">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                            </svg>
-                            <span>{documentosFiltrados.length} documentos</span>
-                        </div>
-                    </div>
 
                     {/* Lista de documentos */}
                     {loading ? (
@@ -273,16 +330,6 @@ export default function Documentos({ onNavigate }) {
                                                     </button>
                                                 )}
 
-                                                <button
-                                                    onClick={() => setDocumentoSeleccionado(documento)}
-                                                    className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
-                                                    <span>Ver</span>
-                                                </button>
                                             </div>
                                         </div>
                                     </div>

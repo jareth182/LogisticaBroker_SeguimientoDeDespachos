@@ -34,13 +34,10 @@ public class ContratoService
             throw new InvalidOperationException($"El contrato no puede ser firmado en estado: {contrato.EstadoFirma}");
         }
 
-        // Generar firma digital
-        var firmaDigital = await GenerarFirmaDigitalAsync(request);
-
         // Actualizar contrato en base de datos
         contrato.FechaFirma = DateTime.UtcNow;
         contrato.EstadoFirma = "Firmado";
-        contrato.TokenFirma = firmaDigital;
+        contrato.TokenFirma = request.FirmaDigital;
         contrato.UrlDocumento = await GenerarPDFContratoAsync(contrato);
 
         // Guardar cambios en base de datos
@@ -55,7 +52,7 @@ public class ContratoService
             ContratoId = id,
             Mensaje = "Contrato firmado correctamente",
             ContratoFirmado = contrato.UrlDocumento,
-            FirmaDigital = firmaDigital,
+            FirmaDigital = request.FirmaDigital,
             FechaFirma = DateTime.UtcNow,
             UrlAlmacenamiento = contrato.UrlDocumento
         };
@@ -102,7 +99,7 @@ public class ContratoService
         var empresa = await _context.Empresas.FindAsync(empresaId);
         if (empresa != null)
         {
-            empresa.Estado = "Activo";
+            empresa.Estado = "Afiliado Activo";
             await _context.SaveChangesAsync();
         }
 

@@ -351,6 +351,8 @@ public class AppDbContext : DbContext
             e.Property(x => x.TipoDocumento).HasMaxLength(80).IsRequired();
             e.Property(x => x.NombreArchivo).HasMaxLength(200).IsRequired();
             e.Property(x => x.RutaArchivo).HasMaxLength(400).IsRequired();
+            e.Property(x => x.Estado).HasMaxLength(30).HasDefaultValue("En revisión");
+            e.Property(x => x.Observacion).HasMaxLength(500);
 
             e.HasOne(x => x.Despacho)
              .WithMany()

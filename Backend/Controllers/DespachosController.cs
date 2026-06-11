@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using LogisticaBroker.DTOs;
 using LogisticaBroker.Models;
 using LogisticaBroker.Repositories.Interfaces;
@@ -58,18 +59,25 @@ namespace LogisticaBroker.Controllers
             if (idEmpresa.HasValue)
                 despachos = despachos.Where(d => d.IdEmpresa == idEmpresa.Value);
 
+            var idsConItemsList = await _context.ItemsFactura
+                .Select(i => i.IdDespacho)
+                .Distinct()
+                .ToListAsync();
+            var idsConItems = new HashSet<int>(idsConItemsList);
+
             var resultado = despachos.Select(d => new DespachoListDto
             {
-                IdDespacho    = d.IdDespacho,
-                IdEmpresa     = d.IdEmpresa,
-                Ruc           = d.Empresa?.Ruc,
-                RazonSocial   = d.Empresa?.RazonSocial,
-                CodigoOrden   = d.CodigoOrden,
-                CodigoBl      = d.CodigoBl,
-                Estado        = d.Estado,
-                FechaCreacion = d.FechaCreacion,
-                Eta           = d.Eta,
-                NombreCanal   = d.Canal?.NombreCanal
+                IdDespacho         = d.IdDespacho,
+                IdEmpresa          = d.IdEmpresa,
+                Ruc                = d.Empresa?.Ruc,
+                RazonSocial        = d.Empresa?.RazonSocial,
+                CodigoOrden        = d.CodigoOrden ?? string.Empty,
+                CodigoBl           = d.CodigoBl ?? string.Empty,
+                Estado             = d.Estado ?? string.Empty,
+                FechaCreacion      = d.FechaCreacion,
+                Eta                = d.Eta,
+                NombreCanal        = d.Canal?.NombreCanal,
+                TieneItemsFactura  = idsConItems.Contains(d.IdDespacho)
             });
 
             return Ok(resultado);
@@ -156,26 +164,111 @@ namespace LogisticaBroker.Controllers
             return Ok(new { mensaje = $"Estado actualizado a '{dto.Estado}'.", estado = despacho.Estado });
         }
 
+        // PATCH: api/Despachos/{id}/numeracion — registra numeración DAM y canal SUNAT (HU16)
+        [HttpPatch("{id}/numeracion")]
+        public async Task<IActionResult> RegistrarNumeracion(int id, [FromBody] RegistrarNumeracionDto dto)
+        {
+            var despacho = await _context.Despachos.FindAsync(id);
+            if (despacho == null)
+                return NotFound(new { mensaje = "Despacho no encontrado." });
+
+            if (string.IsNullOrWhiteSpace(dto.Canal))
+                return BadRequest(new { mensaje = "El canal es requerido." });
+
+            var nombresValidos = new[] { "Verde", "Naranja", "Rojo" };
+            if (!nombresValidos.Contains(dto.Canal))
+                return BadRequest(new { mensaje = "Canal inválido. Use Verde, Naranja o Rojo." });
+
+            var canal = await _context.CanalesSunat.FirstOrDefaultAsync(c => c.NombreCanal == dto.Canal);
+            if (canal == null)
+            {
+                canal = new CanalSunat { NombreCanal = dto.Canal };
+                _context.CanalesSunat.Add(canal);
+                await _context.SaveChangesAsync();
+            }
+
+            despacho.IdCanal = canal.IdCanal;
+            despacho.Estado  = $"Canal {dto.Canal}";
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                mensaje      = "Numeración registrada correctamente.",
+                canal        = dto.Canal,
+                estadoNuevo  = despacho.Estado,
+                idCanal      = canal.IdCanal
+            });
+        }
+
         // DELETE: api/Despachos/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> EliminarDespacho(int id)
         {
-            var despacho = await _despachoRepository.GetByIdAsync(id);
+            var despacho = await _context.Despachos.FindAsync(id);
             if (despacho == null)
                 return NotFound(new { mensaje = "Despacho no encontrado." });
 
-            if (despacho.Estado == "Liquidación Terminada")
-                return BadRequest(new { mensaje = "No se puede eliminar un despacho con DAM finalizada." });
+            // 1. PartidasArancelarias → FK Restrict sobre Despacho, eliminar primero
+            await _context.PartidasArancelarias
+                .Where(p => p.IdDespacho == id)
+                .ExecuteDeleteAsync();
 
-            _despachoRepository.Delete(despacho);
-            await _unitOfWork.SaveChangesAsync();
+            // 2. Despacho (DB cascade maneja EtapasDespacho, DiligenciaAforo, Dam, Comprobantes, etc.)
+            await _context.Despachos
+                .Where(d => d.IdDespacho == id)
+                .ExecuteDeleteAsync();
 
-            return Ok(new { mensaje = $"Despacho {despacho.CodigoOrden} eliminado correctamente." });
+            return Ok(new { mensaje = "Despacho eliminado correctamente." });
+        }
+
+        // PUT: api/Despachos/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> ActualizarDespacho(int id, [FromBody] ActualizarDespachoDto dto)
+        {
+            var despacho = await _context.Despachos.FindAsync(id);
+            if (despacho == null)
+                return NotFound(new { mensaje = "Despacho no encontrado." });
+
+            if (despacho.CodigoBl != dto.CodigoBl)
+            {
+                var existe = await _context.Despachos
+                    .AnyAsync(d => d.CodigoBl == dto.CodigoBl && d.IdDespacho != id);
+                if (existe)
+                    return BadRequest(new { mensaje = "Ya existe un despacho con este número de Bill of Lading." });
+            }
+
+            despacho.IdEmpresa = dto.IdEmpresa;
+            despacho.CodigoBl  = dto.CodigoBl;
+            await _context.SaveChangesAsync();
+
+            var empresa = await _context.Empresas.FindAsync(despacho.IdEmpresa);
+            return Ok(new
+            {
+                mensaje     = "Despacho actualizado correctamente.",
+                codigoOrden = despacho.CodigoOrden,
+                estado      = despacho.Estado,
+                codigoBl    = despacho.CodigoBl,
+                razonSocial = empresa?.RazonSocial,
+                ruc         = empresa?.Ruc,
+                idDespacho  = despacho.IdDespacho
+            });
         }
     }
 
     public class ActualizarEstadoDto
     {
         public string Estado { get; set; } = null!;
+    }
+
+    public class ActualizarDespachoDto
+    {
+        public int IdEmpresa { get; set; }
+        public string CodigoBl { get; set; } = null!;
+    }
+
+    public class RegistrarNumeracionDto
+    {
+        public string? NumeracionDam { get; set; }
+        public string Canal { get; set; } = null!;
     }
 }

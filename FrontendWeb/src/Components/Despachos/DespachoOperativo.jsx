@@ -108,7 +108,7 @@ function ClienteSelector({ value, onChange, error }) {
 }
 
 /* ── Pantalla de resultado (MSG de confirmación con código) ── */
-function PantallaResultado({ despacho, onNuevo, onVolver }) {
+function PantallaResultado({ despacho, onNuevo, onVolver, esEdicion }) {
     return (
         <div className="max-w-xl mx-auto">
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -119,8 +119,12 @@ function PantallaResultado({ despacho, onNuevo, onVolver }) {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-1">¡Despacho creado exitosamente!</h2>
-                    <p className="text-sm text-gray-500 mb-6">El expediente ha sido registrado en estado Aperturado.</p>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">
+                        {esEdicion ? '¡Cambios guardados exitosamente!' : '¡Despacho creado exitosamente!'}
+                    </h2>
+                    <p className="text-sm text-gray-500 mb-6">
+                        {esEdicion ? 'Los datos del despacho han sido actualizados.' : 'El expediente ha sido registrado en estado Aperturado.'}
+                    </p>
 
                     <div className="inline-flex items-center gap-3 bg-[#1a2540] text-white px-6 py-3 rounded-xl mb-6">
                         <svg className="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +141,7 @@ function PantallaResultado({ despacho, onNuevo, onVolver }) {
                             { label: 'Cliente',        value: despacho.razonSocial },
                             { label: 'RUC',            value: despacho.ruc, mono: true },
                             { label: 'Bill of Lading', value: despacho.codigoBl, mono: true },
-                            { label: 'Estado inicial', value: despacho.estado || 'Aperturado', badge: true },
+                            { label: 'Estado',         value: despacho.estado || 'Aperturado', badge: true },
                         ].map(f => (
                             <div key={f.label} className="flex items-center justify-between px-5 py-3 text-sm">
                                 <span className="text-gray-400">{f.label}</span>
@@ -153,12 +157,14 @@ function PantallaResultado({ despacho, onNuevo, onVolver }) {
                     </div>
 
                     <div className="flex gap-3">
-                        <button
-                            onClick={onNuevo}
-                            className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            + NUEVO DESPACHO
-                        </button>
+                        {!esEdicion && (
+                            <button
+                                onClick={onNuevo}
+                                className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                + NUEVO DESPACHO
+                            </button>
+                        )}
                         <button
                             onClick={onVolver}
                             className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#243050] transition-colors"
@@ -173,9 +179,15 @@ function PantallaResultado({ despacho, onNuevo, onVolver }) {
 }
 
 /* ── Componente principal ─────────────────────────────────── */
-export default function DespachoOperativo({ onVolver }) {
-    const [cliente, setCliente]   = useState(null);
-    const [bl, setBl]             = useState('');
+export default function DespachoOperativo({ onVolver, despachoEditar = null }) {
+    const esEdicion = !!despachoEditar;
+
+    const clienteInicial = despachoEditar
+        ? { idEmpresa: despachoEditar.idEmpresa, razonSocial: despachoEditar.razonSocial, ruc: despachoEditar.ruc }
+        : null;
+
+    const [cliente, setCliente]   = useState(clienteInicial);
+    const [bl, setBl]             = useState(despachoEditar?.codigoBl || '');
     const [errores, setErrores]   = useState({});
     const [loading, setLoading]   = useState(false);
     const [errorApi, setErrorApi] = useState(null);
@@ -199,8 +211,10 @@ export default function DespachoOperativo({ onVolver }) {
         setLoading(true);
         setErrorApi(null);
         try {
-            const res = await fetch(API, {
-                method: 'POST',
+            const url    = esEdicion ? `${API}/${despachoEditar.idDespacho}` : API;
+            const method = esEdicion ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     idEmpresa: cliente.idEmpresa,
@@ -211,24 +225,10 @@ export default function DespachoOperativo({ onVolver }) {
             if (res.ok) {
                 setCreado(data);
             } else {
-                /* Simular si el backend no responde correctamente */
-                setCreado({
-                    codigoOrden: generarCodigo(),
-                    razonSocial: cliente.razonSocial,
-                    ruc:         cliente.ruc,
-                    codigoBl:    normalizeBl(bl),
-                    estado:      'Aperturado',
-                });
+                setErrorApi(data.mensaje || 'Ocurrió un error. Verifica los datos ingresados.');
             }
         } catch {
-            /* Simular creación sin conexión */
-            setCreado({
-                codigoOrden: generarCodigo(),
-                razonSocial: cliente.razonSocial,
-                ruc:         cliente.ruc,
-                codigoBl:    normalizeBl(bl),
-                estado:      'Aperturado',
-            });
+            setErrorApi('Error de conexión con el servidor.');
         } finally {
             setLoading(false);
         }
@@ -244,7 +244,7 @@ export default function DespachoOperativo({ onVolver }) {
 
     /* ── Pantalla resultado (MSG confirmación) ── */
     if (creado) {
-        return <PantallaResultado despacho={creado} onNuevo={resetear} onVolver={onVolver} />;
+        return <PantallaResultado despacho={creado} onNuevo={resetear} onVolver={onVolver} esEdicion={esEdicion} />;
     }
 
     /* ── Formulario ── */
@@ -254,10 +254,12 @@ export default function DespachoOperativo({ onVolver }) {
             <p className="text-xs text-gray-400 mb-2">
                 <span className="font-medium text-gray-600">Operatividad</span>
                 <span className="mx-1.5">{'>'}</span>
-                <span>Nuevo Despacho</span>
+                <span>{esEdicion ? 'Editar Despacho' : 'Nuevo Despacho'}</span>
             </p>
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Crear Despacho Importación</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">
+                {esEdicion ? 'Editar Despacho de Importación' : 'Crear Despacho Importación'}
+            </h1>
 
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-4">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
@@ -333,9 +335,9 @@ export default function DespachoOperativo({ onVolver }) {
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                                     </svg>
-                                    Creando…
+                                    {esEdicion ? 'Guardando…' : 'Creando…'}
                                 </>
-                            ) : 'CONFIRMAR Y CREAR DESPACHO'}
+                            ) : (esEdicion ? 'GUARDAR CAMBIOS' : 'CONFIRMAR Y CREAR DESPACHO')}
                         </button>
                     </div>
                 </div>

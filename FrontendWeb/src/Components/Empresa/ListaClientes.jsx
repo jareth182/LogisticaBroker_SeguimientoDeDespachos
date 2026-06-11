@@ -72,29 +72,112 @@ function Paginacion({ paginaActual, totalPaginas, onChange }) {
 
 const esActivo = (estado) => estado === 'Activo' || estado === 'Afiliado Activo';
 
-export default function ListaClientes({ onNuevoCliente }) {
-    const [empresas, setEmpresas]       = useState([]);
-    const [loading, setLoading]         = useState(true);
-    const [busqueda, setBusqueda]       = useState('');
-    const [filtroEstado, setFiltroEstado] = useState('Todos');
-    const [pagina, setPagina]           = useState(1);
+const ESTADOS = ['Pendiente', 'Activo', 'Afiliado Activo', 'Inactivo', 'Suspendido'];
+
+export default function ListaClientes({ onNuevoCliente, onEditarCliente }) {
+    const [empresas, setEmpresas]           = useState([]);
+    const [loading, setLoading]             = useState(true);
+    const [busqueda, setBusqueda]           = useState('');
+    const [filtroEstado, setFiltroEstado]   = useState('Todos');
+    const [pagina, setPagina]               = useState(1);
+    const [mensaje, setMensaje]             = useState(null);
+    const [confirmEliminar, setConfirmEliminar] = useState(null);
+    const [eliminando, setEliminando]       = useState(false);
+    const [empresaEditando, setEmpresaEditando] = useState(null);
+    const [formEdit, setFormEdit]           = useState({});
+    const [guardando, setGuardando]         = useState(false);
 
     useEffect(() => {
-        const cargar = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch(API);
-                if (res.ok) setEmpresas(await res.json());
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
-            }
-        };
         cargar();
     }, []);
 
+    const cargar = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(API);
+            if (res.ok) setEmpresas(await res.json());
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => { setPagina(1); }, [busqueda, filtroEstado]);
+
+    const mostrarMensaje = (texto, tipo = 'exito') => {
+        setMensaje({ texto, tipo });
+        setTimeout(() => setMensaje(null), 4000);
+    };
+
+    const abrirConfirmEliminar = (empresa) => setConfirmEliminar(empresa);
+    const cerrarConfirmEliminar = () => setConfirmEliminar(null);
+
+    const handleEliminar = async () => {
+        if (!confirmEliminar) return;
+        setEliminando(true);
+        try {
+            const res = await fetch(`${API}/${confirmEliminar.idEmpresa}`, { method: 'DELETE' });
+            if (res.ok) {
+                setEmpresas(prev => prev.filter(e => e.idEmpresa !== confirmEliminar.idEmpresa));
+                cerrarConfirmEliminar();
+                mostrarMensaje('Se ha eliminado el cliente');
+            } else {
+                const data = await res.json();
+                mostrarMensaje(data.error || 'Error al eliminar el cliente', 'error');
+            }
+        } catch {
+            mostrarMensaje('Error de conexión al eliminar', 'error');
+        } finally {
+            setEliminando(false);
+        }
+    };
+
+    const abrirEditar = (empresa) => {
+        setEmpresaEditando(empresa);
+        setFormEdit({
+            razonSocial:    empresa.razonSocial    || '',
+            nombreContacto: empresa.nombreContacto || '',
+            correo:         empresa.correo         || '',
+            celular:        empresa.celular        || '',
+            estado:         empresa.estado         || 'Pendiente',
+        });
+    };
+
+    const cerrarEditar = () => { setEmpresaEditando(null); setFormEdit({}); };
+
+    const handleGuardar = async () => {
+        setGuardando(true);
+        try {
+            const res = await fetch(`${API}/${empresaEditando.idEmpresa}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    razonSocial:    formEdit.razonSocial,
+                    nombreContacto: formEdit.nombreContacto,
+                    correo:         formEdit.correo,
+                    celular:        formEdit.celular,
+                    estado:         formEdit.estado,
+                }),
+            });
+            if (res.ok) {
+                setEmpresas(prev => prev.map(e =>
+                    e.idEmpresa === empresaEditando.idEmpresa
+                        ? { ...e, ...formEdit }
+                        : e
+                ));
+                cerrarEditar();
+                mostrarMensaje('Cliente actualizado correctamente');
+            } else {
+                const data = await res.json();
+                mostrarMensaje(data.error || 'Error al actualizar el cliente', 'error');
+            }
+        } catch {
+            mostrarMensaje('Error de conexión al actualizar', 'error');
+        } finally {
+            setGuardando(false);
+        }
+    };
 
     const formatFecha = (f) => {
         if (!f) return '—';
@@ -104,8 +187,8 @@ export default function ListaClientes({ onNuevoCliente }) {
         } catch { return f; }
     };
 
-    const totalClientes = empresas.length;
-    const totalActivos  = empresas.filter(e => esActivo(e.estado)).length;
+    const totalClientes   = empresas.length;
+    const totalActivos    = empresas.filter(e => esActivo(e.estado)).length;
     const totalPendientes = empresas.filter(e => e.estado === 'Pendiente').length;
 
     const empresasFiltradas = empresas.filter(e => {
@@ -123,6 +206,115 @@ export default function ListaClientes({ onNuevoCliente }) {
 
     return (
         <div>
+            {/* ── Mensaje toast ── */}
+            {mensaje && (
+                <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 transition-all ${
+                    mensaje.tipo === 'exito'
+                        ? 'bg-green-50 border border-green-200 text-green-800'
+                        : 'bg-red-50 border border-red-200 text-red-800'
+                }`}>
+                    {mensaje.tipo === 'exito'
+                        ? <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                        : <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    }
+                    {mensaje.texto}
+                </div>
+            )}
+
+            {/* ── Modal confirmar eliminar ── */}
+            {confirmEliminar && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-base font-bold text-gray-900">Eliminar cliente</h3>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={cerrarConfirmEliminar}
+                                disabled={eliminando}
+                                className="flex-1 py-2 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleEliminar}
+                                disabled={eliminando}
+                                className="flex-1 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+                            >
+                                {eliminando ? 'Eliminando…' : 'Eliminar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal editar ── */}
+            {empresaEditando && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <h3 className="text-base font-bold text-gray-900">Editar cliente</h3>
+                            <button onClick={cerrarEditar} className="text-gray-400 hover:text-gray-600">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            {[
+                                { label: 'Razón Social', key: 'razonSocial' },
+                                { label: 'Nombre de Contacto', key: 'nombreContacto' },
+                                { label: 'Correo', key: 'correo', type: 'email' },
+                                { label: 'Celular', key: 'celular' },
+                            ].map(({ label, key, type = 'text' }) => (
+                                <div key={key}>
+                                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">{label}</label>
+                                    <input
+                                        type={type}
+                                        value={formEdit[key] || ''}
+                                        onChange={ev => setFormEdit(f => ({ ...f, [key]: ev.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2540]/20 focus:border-[#1a2540]"
+                                    />
+                                </div>
+                            ))}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Estado</label>
+                                <select
+                                    value={formEdit.estado || 'Pendiente'}
+                                    onChange={ev => setFormEdit(f => ({ ...f, estado: ev.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2540]/20 focus:border-[#1a2540] bg-white"
+                                >
+                                    {ESTADOS.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+                            <button
+                                onClick={cerrarEditar}
+                                disabled={guardando}
+                                className="flex-1 py-2 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleGuardar}
+                                disabled={guardando}
+                                className="flex-1 py-2 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#243050] transition-colors disabled:opacity-60"
+                            >
+                                {guardando ? 'Guardando…' : 'Guardar cambios'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Header ── */}
             <div className="flex items-start justify-between mb-4">
                 <div>
@@ -230,14 +422,20 @@ export default function ListaClientes({ onNuevoCliente }) {
                                     <td className="px-6 py-4"><EstadoBadge estado={e.estado} /></td>
                                     <td className="px-6 py-4 text-sm text-gray-600">{formatFecha(e.fechaRegistro)}</td>
                                     <td className="px-6 py-4">
-                                        <button
-                                            className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                                            title="Editar cliente"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => onEditarCliente?.(e)}
+                                                className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                            >
+                                                Editar
+                                            </button>
+                                            <button
+                                                onClick={() => abrirConfirmEliminar(e)}
+                                                className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

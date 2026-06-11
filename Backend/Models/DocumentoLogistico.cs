@@ -10,6 +10,8 @@ public class DocumentoLogistico
     public long TamanoBytes { get; set; }
     public DateTime FechaCarga { get; set; } = DateTime.UtcNow;
     public int IdUsuarioCargador { get; set; }
+    public string Estado { get; set; } = "En revisión";
+    public string? Observacion { get; set; }
 
     // Navegación
     public Despacho Despacho { get; set; } = null!;

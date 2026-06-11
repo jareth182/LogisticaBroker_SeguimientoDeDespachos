@@ -206,15 +206,6 @@ export default function AdjuntarDocumentosLegales({ onAvanzarFirma }) {
                     )}
 
                     <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-gray-100">
-                        <button
-                            onClick={handleGuardarBorrador}
-                            disabled={guardando || !hayAlMenosUno}
-                            className={`px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg transition-colors ${
-                                hayAlMenosUno && !guardando ? 'hover:bg-gray-50' : 'opacity-50 cursor-not-allowed'
-                            }`}
-                        >
-                            {guardando ? 'Guardando...' : 'Guardar borrador'}
-                        </button>
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={handleSubir}

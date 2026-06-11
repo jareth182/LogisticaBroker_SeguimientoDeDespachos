@@ -16,6 +16,7 @@ import AdjuntarDocumentosLegales from './Components/Documentos/AdjuntarDocumento
 import DocumentacionLogistica from './Components/Despachos/DocumentacionLogistica';
 import ExtraerDatosFactura from './Components/Despachos/ExtraerDatosFactura';
 import EditarDetalleMercancia from './Components/Despachos/EditarDetalleMercancia';
+import BorradorDAM from './Components/Despachos/BorradorDAM';
 import BorradorDAMFinal from './Components/Despachos/BorradorDAMFinal';
 import LiquidacionTributaria from './Components/Despachos/LiquidacionTributaria';
 import AdjuntarComprobantes from './Components/Despachos/AdjuntarComprobantes';
@@ -30,6 +31,7 @@ import ProgramarDevolucionContenedor from './Components/Despachos/ProgramarDevol
 import GenerarLiquidacionFinal from './Components/Despachos/GenerarLiquidacionFinal';
 import SeguimientoImportacion from './Components/Tracking/SeguimientoImportacion';
 import PanelControl from './Components/Dashboard/PanelControl';
+import ValidarComprobantesLogisticos from './Components/Despachos/ValidarComprobantesLogisticos';
 
 function tokenEstaExpirado(token) {
   try {
@@ -47,6 +49,7 @@ export default function App() {
   const [requiereCambioContrasena, setRequiereCambio] = useState(false);
   const [view, setView]                               = useState('despachos');
   const [despachoActivo, setDespachoActivo] = useState(null);
+  const [clienteActivo, setClienteActivo]   = useState(null);
   const [liquidacionDespacho, setLiquidacionDespacho] = useState(null);
   const [clasificacionDespacho, setClasificacionDespacho] = useState(null);
   const [itemsExtraidos, setItemsExtraidos] = useState([]);
@@ -74,7 +77,7 @@ export default function App() {
       if (parsedUser.requiereCambioContrasena) {
         setRequiereCambio(true);
       } else if (parsedUser.rol === 'Cliente') {
-        setView(parsedUser.estadoEmpresa === 'Pendiente' ? 'firma-contrato' : 'trazabilidad');
+        setView(parsedUser.estadoEmpresa === 'Pendiente' ? 'documentacion' : 'trazabilidad');
       }
     }
   }, []);
@@ -86,7 +89,7 @@ export default function App() {
       return;
     }
     if (usuarioData.rol === 'Cliente') {
-      setView(usuarioData.estadoEmpresa === 'Pendiente' ? 'firma-contrato' : 'trazabilidad');
+      setView(usuarioData.estadoEmpresa === 'Pendiente' ? 'documentacion' : 'trazabilidad');
     } else {
       setView('despachos');
     }
@@ -98,7 +101,7 @@ export default function App() {
     setUsuario(updatedUser);
     localStorage.setItem('usuario', JSON.stringify(updatedUser));
     if (updatedUser.rol === 'Cliente') {
-      setView(updatedUser.estadoEmpresa === 'Pendiente' ? 'firma-contrato' : 'trazabilidad');
+      setView(updatedUser.estadoEmpresa === 'Pendiente' ? 'documentacion' : 'trazabilidad');
     } else {
       setView('despachos');
     }
@@ -169,7 +172,7 @@ export default function App() {
 
           {/* ── NAV CLIENTE ── */}
           {usuario?.rol === 'Cliente' ? (<>
-            {usuario.estadoEmpresa === 'Afiliado Activo' ? (<>
+            {usuario.estadoEmpresa !== 'Pendiente' ? (<>
               <NavItem icon="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" text="Panel de Trazabilidad" onClick={() => setView('trazabilidad')} collapsed={isCollapsed} active={view === 'trazabilidad'} />
               <NavItem icon="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" text="Seguimiento de Importación" onClick={() => setView('seguimiento-importacion')} collapsed={isCollapsed} active={view === 'seguimiento-importacion'} />
               <NavItem icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" text="Mis Documentos" onClick={() => setView('documentos')} collapsed={isCollapsed} active={view === 'documentos'} />
@@ -185,7 +188,7 @@ export default function App() {
             text="Despachos"
             onClick={() => setView('despachos')}
             collapsed={isCollapsed}
-            active={view === 'despachos' || view === 'nuevo-despacho' || view === 'detalle' || view === 'clasificacion' || view === 'liquidaciones'}
+            active={view === 'despachos' || view === 'nuevo-despacho' || view === 'detalle' || view === 'clasificacion' || view === 'liquidaciones' || view === 'editar-despacho'}
           />
           <NavItem
             icon="M12 4v16m8-8H4"
@@ -216,10 +219,10 @@ export default function App() {
           )}
           <NavItem
             icon="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-            text="Administración"
+            text="Clientes"
             onClick={() => setView('clientes')}
             collapsed={isCollapsed}
-            active={view === 'clientes' || view === 'nuevo-cliente'}
+            active={view === 'clientes' || view === 'nuevo-cliente' || view === 'editar-cliente'}
           />
 
           <NavItem
@@ -300,6 +303,7 @@ export default function App() {
                   onNuevoDespacho={() => setView('nuevo-despacho')}
                   onDocumentacionLogistica={(d) => { setDespachoActivo(d); setView('documentacion-logistica'); }}
                   onExtraerFactura={(d) => { setDespachoActivo(d); setView('extraer-factura'); }}
+                  onVerBorradorDAM={(d) => { setDespachoActivo(d); setView('borrador-dam'); }}
                   onVerTributos={(d) => { setDespachoActivo(d); setView('liquidacion-tributaria'); }}
                   onAdjuntarComprobantes={(d) => { setDespachoActivo(d); setView('adjuntar-comprobantes'); }}
                   onValidarComprobantes={(d) => { setDespachoActivo(d); setView('validar-comprobantes'); }}
@@ -307,11 +311,13 @@ export default function App() {
                   onObservacionesAforo={(d) => { setDespachoActivo(d); setView('observaciones-aforo'); }}
                   onRegistrarLevante={(d) => { setDespachoActivo(d); setView('registrar-levante'); }}
                   onComprobantesLogisticos={(d) => { setDespachoActivo(d); setView('comprobantes-logisticos'); }}
+                  onValidarComprobantesLogisticos={(d) => { setDespachoActivo(d); setView('validar-comprobantes-logisticos'); }}
                   onProgramarRetiro={(d) => { setDespachoActivo(d); setView('programar-retiro'); }}
                   onConfirmarEntrega={(d) => { setDespachoActivo(d); setView('confirmar-entrega'); }}
                   onDevolucionContenedor={(d) => { setDespachoActivo(d); setView('devolucion-contenedor'); }}
                   onLiquidacionFinal={(d) => { setDespachoActivo(d); setView('liquidacion-final'); }}
                   onVerSeguimiento={(d) => { setDespachoActivo(d); setView('seguimiento-importacion'); }}
+                  onEditarDespacho={(d) => { setDespachoActivo(d); setView('editar-despacho'); }}
               />
           )}
 
@@ -320,6 +326,14 @@ export default function App() {
             <DespachoOperativo
               onVerDetalle={handleVerDetalle}
               onVolver={() => setView('despachos')}
+            />
+          )}
+
+          {/* ── Editar despacho ── */}
+          {view === 'editar-despacho' && despachoActivo && (
+            <DespachoOperativo
+              despachoEditar={despachoActivo}
+              onVolver={() => { setDespachoActivo(null); setView('despachos'); }}
             />
           )}
 
@@ -375,6 +389,7 @@ export default function App() {
           {view === 'documentacion-logistica' && despachoActivo && (
               <DocumentacionLogistica
                   despacho={despachoActivo}
+                  usuario={usuario}
                   onVolver={() => setView('despachos')}
               />
           )}
@@ -388,6 +403,26 @@ export default function App() {
                       setItemsExtraidos(items);
                       setView('editar-detalle');
                   }}
+                  onGenerarBorrador={(items) => {
+                      setItemsExtraidos(items);
+                      setView('borrador-dam-final');
+                  }}
+              />
+          )}
+
+          {/* ── Borrador DAM (acceso directo desde lista despachos) ── */}
+          {view === 'borrador-dam' && despachoActivo && (
+              <BorradorDAM
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  onIrEditar={(items) => {
+                      setItemsExtraidos(items);
+                      setView('editar-detalle');
+                  }}
+                  onGenerarBorrador={(items) => {
+                      setItemsExtraidos(items);
+                      setView('borrador-dam-final');
+                  }}
               />
           )}
 
@@ -396,7 +431,7 @@ export default function App() {
               <EditarDetalleMercancia
                   despacho={despachoActivo}
                   itemsIniciales={itemsExtraidos}
-                  onVolver={() => setView('extraer-factura')}
+                  onVolver={() => setView('borrador-dam')}
                   onIrBorrador={() => setView('borrador-dam-final')}
               />
           )}
@@ -466,12 +501,22 @@ export default function App() {
               />
           )}
 
+          {/* ── Validar Comprobantes Logísticos (Admin) ── */}
+          {view === 'validar-comprobantes-logisticos' && (
+              <ValidarComprobantesLogisticos
+                  despacho={despachoActivo}
+                  onVolver={() => setView('despachos')}
+                  usuario={usuario}
+              />
+          )}
+
           {/* ── HU19: Registrar Comprobantes Logísticos ── */}
           {view === 'comprobantes-logisticos' && (
               <RegistrarComprobantesLogisticos
                   despacho={despachoActivo}
                   onVolver={() => setView('despachos')}
                   onAsignarTransporte={(d) => { setDespachoActivo(d); setView('programar-retiro'); }}
+                  usuario={usuario}
               />
           )}
 
@@ -525,11 +570,21 @@ export default function App() {
 
           {/* ── Clientes ── */}
           {view === 'clientes' && (
-            <ListaClientes onNuevoCliente={() => setView('nuevo-cliente')} />
+            <ListaClientes
+              onNuevoCliente={() => setView('nuevo-cliente')}
+              onEditarCliente={(empresa) => { setClienteActivo(empresa); setView('editar-cliente'); }}
+            />
           )}
 
           {view === 'nuevo-cliente' && (
             <RegistrarEmpresa onVolver={() => setView('clientes')} />
+          )}
+
+          {view === 'editar-cliente' && clienteActivo && (
+            <RegistrarEmpresa
+              empresaEditar={clienteActivo}
+              onVolver={() => { setClienteActivo(null); setView('clientes'); }}
+            />
           )}
 
         </div>

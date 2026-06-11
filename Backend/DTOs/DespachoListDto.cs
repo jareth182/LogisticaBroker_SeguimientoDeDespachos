@@ -12,5 +12,6 @@ namespace LogisticaBroker.DTOs
         public DateTime FechaCreacion { get; set; }
         public DateOnly? Eta { get; set; }
         public string? NombreCanal { get; set; }
+        public bool TieneItemsFactura { get; set; }
     }
 }

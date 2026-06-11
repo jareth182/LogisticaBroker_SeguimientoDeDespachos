@@ -52,4 +52,40 @@ public class EmpresaController : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Eliminar(int id)
+    {
+        try
+        {
+            await _service.EliminarEmpresaAsync(id);
+            return Ok(new { mensaje = "Se ha eliminado el cliente" });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Actualizar(int id, [FromBody] Empresa datos)
+    {
+        try
+        {
+            var empresa = await _service.ActualizarEmpresaAsync(id, datos);
+            return Ok(empresa);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
 }

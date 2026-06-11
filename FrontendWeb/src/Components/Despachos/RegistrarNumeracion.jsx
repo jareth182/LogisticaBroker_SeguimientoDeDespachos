@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+const API_DESP = 'http://localhost:5018/api/Despachos';
 // Formato estándar SUNAT: dos letras seguidas de diez dígitos (ej. CO0123456789)
 const REGEX_DAM = /^[A-Za-z]{2}[0-9]{10}$/;
 
@@ -21,7 +22,7 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
         setErrorFormato('');
     };
 
-    const handleRegistrar = () => {
+    const handleRegistrar = async () => {
         setIntentoRegistrar(true);
         setErrorConexion('');
 
@@ -35,17 +36,26 @@ export default function RegistrarNumeracion({ despacho, onVolver, onRegistrado }
         setErrorFormato('');
 
         setProcesando(true);
-        setTimeout(() => {
-            try {
-                setCanalRegistrado(canal);
-                setRegistrado(true);
-                onRegistrado?.({ numeracion, canal });
-            } catch {
-                // CA2.4: error de conexión
-                setErrorConexion('Error al registrar la numeración. Intenta nuevamente');
+        try {
+            const res = await fetch(`${API_DESP}/${despacho.idDespacho}/numeracion`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numeracionDam: numeracion.trim(), canal }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setErrorConexion(data.mensaje || 'Error al registrar la numeración. Intenta nuevamente');
+                setProcesando(false);
+                return;
             }
-            setProcesando(false);
-        }, 1000);
+            setCanalRegistrado(canal);
+            setRegistrado(true);
+            onRegistrado?.({ numeracion, canal });
+        } catch {
+            // CA2.4: error de conexión
+            setErrorConexion('Error al registrar la numeración. Intenta nuevamente');
+        }
+        setProcesando(false);
     };
 
     if (registrado) {

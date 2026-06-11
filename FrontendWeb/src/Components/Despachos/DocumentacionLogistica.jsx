@@ -27,7 +27,15 @@ function formatFecha(iso) {
     return d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export default function DocumentacionLogistica({ despacho, onVolver }) {
+function badgeEstado(estado) {
+    if (estado === 'Aprobado')   return 'bg-green-100 text-green-700';
+    if (estado === 'Observado')  return 'bg-red-100 text-red-700';
+    return 'bg-blue-100 text-blue-700'; // En revisión
+}
+
+export default function DocumentacionLogistica({ despacho, usuario, onVolver }) {
+    const esAdmin = usuario?.rol === 'Administrador';
+
     const [docs, setDocs]         = useState([]);
     const [loading, setLoading]   = useState(true);
     const [tipo, setTipo]         = useState('');
@@ -38,6 +46,10 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
     const inputRef = useRef();
 
     const [errorCarga, setErrorCarga] = useState(null);
+    const [obsActiva, setObsActiva]   = useState(null); // idDocumento con panel de obs abierto
+    const [obsTexto, setObsTexto]     = useState('');
+    const [revisandoId, setRevisandoId] = useState(null);
+    const [descargandoId, setDescargandoId] = useState(null);
 
     useEffect(() => { cargar(); }, [despacho.idDespacho]);
 
@@ -55,8 +67,8 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
     const validarArchivo = (file) => {
         if (!file) return null;
         const ext = file.name.split('.').pop().toLowerCase();
-        if (!['pdf', 'jpg', 'jpeg'].includes(ext))
-            return 'El formato del archivo no es válido. Solo se aceptan PDF y JPG';
+        if (!['pdf', 'jpg', 'jpeg', 'xls', 'xlsx'].includes(ext))
+            return 'El formato del archivo no es válido. Solo se aceptan PDF, JPG o Excel';
         if (file.size > 5 * 1024 * 1024)
             return 'El archivo supera el tamaño máximo permitido de 5 MB';
         return null;
@@ -73,6 +85,75 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
         e.preventDefault(); setDragging(false);
         const file = e.dataTransfer.files[0];
         if (file) onFileChange(file);
+    };
+
+    const handleEliminar = async (idDocumento) => {
+        try {
+            await fetch(`${API}/${idDocumento}`, { method: 'DELETE' });
+            setDocs(prev => prev.filter(d => d.idDocumentoLogistico !== idDocumento));
+        } catch { /* silencioso */ }
+    };
+
+    const handleDescargar = async (doc) => {
+        if (!doc?.rutaArchivo) {
+            setMensaje({ tipo: 'error', texto: 'No se encontró la ruta de descarga del documento.' });
+            return;
+        }
+
+        setDescargandoId(doc.idDocumentoLogistico);
+        setMensaje(null);
+
+        try {
+            const enlace = document.createElement('a');
+            enlace.href = `${API}/${doc.idDocumentoLogistico}/archivo`;
+            enlace.target = '_blank';
+            enlace.rel = 'noreferrer';
+            enlace.download = doc.nombreArchivo || 'documento';
+            document.body.appendChild(enlace);
+            enlace.click();
+            enlace.remove();
+        } catch {
+            setMensaje({ tipo: 'error', texto: 'No se pudo descargar el documento. Verifique su conexión e intente nuevamente.' });
+        } finally {
+            setDescargandoId(null);
+        }
+    };
+
+    const handleRevisar = async (idDocumento, estado, observacion = null) => {
+        if (revisandoId) return;
+
+        const snapshot = docs;
+        setRevisandoId(idDocumento);
+
+        setDocs(prev => prev.map(d => (
+            d.idDocumentoLogistico === idDocumento
+                ? { ...d, estado, observacion: estado === 'Observado' ? observacion : null }
+                : d
+        )));
+        setObsActiva(null);
+        setObsTexto('');
+
+        try {
+            const res = await fetch(`${API}/${idDocumento}/revisar`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado, observacion }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setDocs(prev => prev.map(d =>
+                    d.idDocumentoLogistico === idDocumento
+                        ? { ...d, estado: data.estado, observacion: data.observacion }
+                        : d
+                ));
+            } else {
+                setDocs(snapshot);
+            }
+        } catch {
+            setDocs(snapshot);
+        } finally {
+            setRevisandoId(null);
+        }
     };
 
     const handleSubir = async () => {
@@ -136,7 +217,7 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
 
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">Documentación Logística</h1>
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">Adjuntar Documentación Logística</h1>
                 <div className="flex items-center gap-3 mt-2">
                     <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-2">
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Referencia BL</p>
@@ -194,7 +275,7 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                         <input
                             ref={inputRef}
                             type="file"
-                            accept=".pdf,.jpg,.jpeg"
+                            accept=".pdf,.jpg,.jpeg,.xls,.xlsx"
                             className="hidden"
                             onChange={e => onFileChange(e.target.files[0])}
                         />
@@ -260,18 +341,87 @@ export default function DocumentacionLogistica({ despacho, onVolver }) {
                         <div className="space-y-3 overflow-y-auto max-h-96">
                             {docs.map(doc => {
                                 const ic = icono(doc.nombreArchivo);
+                                const abrirObs = obsActiva === doc.idDocumentoLogistico;
                                 return (
-                                    <div key={doc.idDocumentoLogistico} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
-                                        <div className={`w-10 h-10 rounded-lg ${ic.bg} flex items-center justify-center shrink-0`}>
-                                            <span className={`text-xs font-bold ${ic.color}`}>{ic.label}</span>
+                                    <div key={doc.idDocumentoLogistico} className="border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
+                                        <div className="flex items-center gap-3 p-3">
+                                            <div className={`w-10 h-10 rounded-lg ${ic.bg} flex items-center justify-center shrink-0`}>
+                                                <span className={`text-xs font-bold ${ic.color}`}>{ic.label}</span>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-gray-800 truncate">{doc.nombreArchivo}</p>
+                                                <p className="text-xs text-gray-400">
+                                                    {doc.tipoDocumento} · {formatBytes(doc.tamanoBytes)} · {formatFecha(doc.fechaCarga)}
+                                                </p>
+                                                {doc.observacion && (
+                                                    <p className="text-xs text-red-600 mt-0.5">Obs: {doc.observacion}</p>
+                                                )}
+                                            </div>
+                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full shrink-0 ${badgeEstado(doc.estado)}`}>
+                                                {doc.estado}
+                                            </span>
+                                            {esAdmin && doc.estado !== 'Aprobado' && (
+                                                <button
+                                                    onClick={() => handleRevisar(doc.idDocumentoLogistico, 'Aprobado')}
+                                                    disabled={revisandoId === doc.idDocumentoLogistico}
+                                                    className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors shrink-0"
+                                                    title="Aprobar documento"
+                                                >
+                                                    {revisandoId === doc.idDocumentoLogistico ? (
+                                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                                    ) : (
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                                    )}
+                                                </button>
+                                            )}
+                                            {esAdmin && (
+                                                <button
+                                                    onClick={() => { setObsActiva(abrirObs ? null : doc.idDocumentoLogistico); setObsTexto(''); }}
+                                                    disabled={revisandoId === doc.idDocumentoLogistico}
+                                                    className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors shrink-0"
+                                                    title="Registrar observación"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h6m-6 4h10M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" /></svg>
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleDescargar(doc)}
+                                                disabled={descargandoId === doc.idDocumentoLogistico}
+                                                className="p-1.5 text-gray-400 hover:text-[#008b9c] hover:bg-[#e0f7fa] rounded-lg transition-colors shrink-0"
+                                                title="Descargar documento"
+                                            >
+                                                {descargandoId === doc.idDocumentoLogistico ? (
+                                                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+                                                ) : (
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={() => handleEliminar(doc.idDocumentoLogistico)}
+                                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                                                title="Eliminar documento"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                            </button>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-gray-800 truncate">{doc.nombreArchivo}</p>
-                                            <p className="text-xs text-gray-400">
-                                                {doc.tipoDocumento} · {formatBytes(doc.tamanoBytes)} · {formatFecha(doc.fechaCarga)}
-                                            </p>
-                                        </div>
-                                        <span className="px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full shrink-0">En revisión</span>
+                                        {abrirObs && (
+                                            <div className="px-3 pb-3 flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={obsTexto}
+                                                    onChange={e => setObsTexto(e.target.value)}
+                                                    placeholder="Escribe la observación..."
+                                                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                                                />
+                                                <button
+                                                    onClick={() => obsTexto.trim() && handleRevisar(doc.idDocumentoLogistico, 'Observado', obsTexto.trim())}
+                                                    disabled={revisandoId === doc.idDocumentoLogistico}
+                                                    className="px-3 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                                                >
+                                                    {revisandoId === doc.idDocumentoLogistico ? 'Enviando...' : 'Enviar'}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}

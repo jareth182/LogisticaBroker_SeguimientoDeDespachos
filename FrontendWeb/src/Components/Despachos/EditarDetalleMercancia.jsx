@@ -113,7 +113,8 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                     return;
                 }
             }
-            setMsgGlobal({ tipo: 'exito', texto: 'Ítem actualizado correctamente.' });
+            setMsgGlobal({ tipo: 'exito', texto: 'Cambios guardados correctamente.' });
+            setTimeout(() => onVolver(), 800);
         } catch {
             setMsgGlobal({ tipo: 'error', texto: 'Error al guardar los cambios. Intenta nuevamente' });
         } finally {
@@ -370,16 +371,6 @@ export default function EditarDetalleMercancia({ despacho, itemsIniciales, onVol
                     </div>
                 </div>
             )}
-
-            {/* Continuar */}
-            <div className="mt-4 flex justify-end">
-                <button
-                    onClick={onIrBorrador}
-                    className="px-4 py-2 bg-[#1a2540] text-white text-sm font-semibold rounded-lg hover:bg-[#0f1a30] transition-colors"
-                >
-                    Generar Borrador DAM →
-                </button>
-            </div>
         </div>
     );
 }

@@ -103,9 +103,10 @@ public class ContratoController : ControllerBase
                     fechaCreacion = c.FechaGeneracion,
                     fechaFirma = c.FechaFirma,
                     estado = c.EstadoFirma,
-                    contenido = "Contenido del contrato...",
                     firmaDigital = c.TokenFirma,
-                    urlDocumento = c.UrlDocumento
+                    urlDocumento = c.UrlDocumento,
+                    nombreEmpresa = c.Empresa != null ? c.Empresa.RazonSocial : "",
+                    nombreContacto = c.Empresa != null ? c.Empresa.NombreContacto : ""
                 })
                 .FirstOrDefaultAsync();
 

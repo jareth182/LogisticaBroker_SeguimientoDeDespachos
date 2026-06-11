@@ -23,14 +23,27 @@ function EstadoBadge({ estado }) {
 }
 
 /* ── Botón de acciones ────────────────────────────────────── */
-function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, onRegistrarLevante, onComprobantesLogisticos, onProgramarRetiro, onConfirmarEntrega, onDevolucionContenedor, onLiquidacionFinal, onVerSeguimiento, esCliente }) {
+function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerBorradorDAM, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, onRegistrarLevante, onComprobantesLogisticos, onValidarComprobantesLogisticos, onProgramarRetiro, onConfirmarEntrega, onDevolucionContenedor, onLiquidacionFinal, onVerSeguimiento, esCliente }) {
     const [abierto, setAbierto] = useState(false);
-    const ref = useRef(null);
+    const [pos, setPos] = useState({ top: 0, left: 0 });
+    const btnRef = useRef(null);
+    const menuRef = useRef(null);
 
     useEffect(() => {
-        const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setAbierto(false); };
+        const h = (e) => {
+            if (
+                btnRef.current && !btnRef.current.contains(e.target) &&
+                menuRef.current && !menuRef.current.contains(e.target)
+            ) setAbierto(false);
+        };
         document.addEventListener('mousedown', h);
         return () => document.removeEventListener('mousedown', h);
+    }, []);
+
+    useEffect(() => {
+        const onScroll = () => setAbierto(false);
+        window.addEventListener('scroll', onScroll, true);
+        return () => window.removeEventListener('scroll', onScroll, true);
     }, []);
 
     const estado = despacho.estado || '';
@@ -38,17 +51,36 @@ function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtra
 
     const accion = (fn) => { setAbierto(false); fn?.(despacho); };
 
+    const handleToggle = () => {
+        if (!abierto && btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect();
+            const menuH = Math.min(400, window.innerHeight * 0.8);
+            const spaceBelow = window.innerHeight - r.bottom - 8;
+            const top = spaceBelow >= menuH
+                ? r.bottom + 4
+                : Math.max(8, r.top - menuH - 4);
+            const left = Math.min(r.right - 224, window.innerWidth - 232);
+            setPos({ top, left });
+        }
+        setAbierto(v => !v);
+    };
+
     return (
-        <div ref={ref} className="relative" onClick={e => e.stopPropagation()}>
+        <div onClick={e => e.stopPropagation()}>
             <button
-                onClick={() => setAbierto(v => !v)}
+                ref={btnRef}
+                onClick={handleToggle}
                 className={`p-1.5 rounded-lg transition-colors text-base leading-none ${abierto ? 'bg-gray-200 text-gray-700' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
                 title="Opciones"
             >
                 ⚙️
             </button>
             {abierto && (
-                <div className="absolute right-0 top-8 z-50 w-56 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                <div
+                    ref={menuRef}
+                    style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999, maxHeight: '80vh', overflowY: 'auto' }}
+                    className="w-56 bg-white border border-gray-200 rounded-xl shadow-xl"
+                >
                     {/* Ver detalle — siempre disponible */}
                     <button
                         onClick={() => accion(onVerDetalle)}
@@ -83,6 +115,19 @@ function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtra
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h7" />
                             </svg>
                             Extraer datos factura
+                        </button>
+                    )}
+
+                    {/* Ver Borrador DAM — solo Admin, si ya tiene ítems extraídos */}
+                    {!esCliente && despacho.tieneItemsFactura && (
+                        <button
+                            onClick={() => accion(onVerBorradorDAM)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            <svg className="w-4 h-4 text-[#008b9c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Ver Borrador DAM
                         </button>
                     )}
 
@@ -169,6 +214,16 @@ function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtra
                         </button>
                     )}
 
+                    {/* Validar comprobantes logísticos — solo Admin */}
+                    {!esCliente && (
+                        <button onClick={() => accion(onValidarComprobantesLogisticos)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
+                            <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Validar comprobantes logísticos
+                        </button>
+                    )}
+
                     {/* HU20: Programar retiro de carga — solo Admin/Jefe de Operaciones */}
                     {!esCliente && (
                         <button onClick={() => accion(onProgramarRetiro)} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 text-left">
@@ -217,6 +272,7 @@ function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtra
                         </svg>
                         Ver seguimiento
                     </button>
+
                 </div>
             )}
         </div>
@@ -224,18 +280,26 @@ function BtnAcciones({ despacho, onVerDetalle, onDocumentacionLogistica, onExtra
 }
 
 /* ── Componente principal ─────────────────────────────────── */
-export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, onRegistrarLevante, onComprobantesLogisticos, onProgramarRetiro, onConfirmarEntrega, onDevolucionContenedor, onLiquidacionFinal, onVerSeguimiento }) {
+export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocumentacionLogistica, onExtraerFactura, onVerBorradorDAM, onVerTributos, onAdjuntarComprobantes, onValidarComprobantes, onRegistrarNumeracion, onObservacionesAforo, onRegistrarLevante, onComprobantesLogisticos, onValidarComprobantesLogisticos, onProgramarRetiro, onConfirmarEntrega, onDevolucionContenedor, onLiquidacionFinal, onVerSeguimiento, onEditarDespacho }) {
     const [despachos, setDespachos]           = useState([]);
     const [loading, setLoading]               = useState(true);
     const [busqueda, setBusqueda]             = useState('');
     const [busquedaActiva, setBusquedaActiva] = useState('');
     const [paginaActual, setPaginaActual]     = useState(1);
+    const [despachoAEliminar, setDespachoAEliminar] = useState(null);
+    const [eliminando, setEliminando]               = useState(false);
+    const [toast, setToast]                         = useState(null);
     const ITEMS_POR_PAGINA = 10;
 
     const usuario = (() => {
         try { return JSON.parse(localStorage.getItem('usuario') || '{}'); } catch { return {}; }
     })();
     const esCliente = usuario.rol === 'Cliente';
+
+    const mostrarToast = (msg, tipo = 'success') => {
+        setToast({ msg, tipo });
+        setTimeout(() => setToast(null), 4000);
+    };
 
     const cargar = async () => {
         setLoading(true);
@@ -247,6 +311,26 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocume
             if (res.ok) setDespachos(await res.json());
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
+    };
+
+    const handleEliminar = async () => {
+        if (!despachoAEliminar) return;
+        setEliminando(true);
+        try {
+            const res = await fetch(`${API}/${despachoAEliminar.idDespacho}`, { method: 'DELETE' });
+            if (res.ok) {
+                setDespachos(prev => prev.filter(d => d.idDespacho !== despachoAEliminar.idDespacho));
+                mostrarToast('Despacho eliminado correctamente.');
+            } else {
+                const data = await res.json().catch(() => ({}));
+                mostrarToast(data.mensaje || 'Error al eliminar el despacho.', 'error');
+            }
+        } catch {
+            mostrarToast('Error de conexión al eliminar el despacho.', 'error');
+        } finally {
+            setEliminando(false);
+            setDespachoAEliminar(null);
+        }
     };
 
     useEffect(() => { cargar(); }, []);
@@ -282,6 +366,63 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocume
 
     return (
         <div>
+            {/* ── Toast ── */}
+            {toast && (
+                <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl text-sm font-semibold text-white transition-all ${toast.tipo === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+                    {toast.tipo === 'error'
+                        ? <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        : <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                    }
+                    {toast.msg}
+                </div>
+            )}
+
+            {/* ── Modal confirmación eliminar ── */}
+            {despachoAEliminar && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+                        <div className="h-1 bg-red-500" />
+                        <div className="p-6">
+                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-900 text-center mb-1">Eliminar despacho</h3>
+                            <p className="text-sm text-gray-500 text-center mb-1">
+                                ¿Estás seguro de eliminar el despacho
+                            </p>
+                            <p className="text-sm font-bold text-[#1a2540] text-center mb-5">
+                                {despachoAEliminar.codigoOrden} — {despachoAEliminar.codigoBl}?
+                            </p>
+                            <p className="text-xs text-gray-400 text-center mb-6">Esta acción no se puede deshacer.</p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setDespachoAEliminar(null)}
+                                    disabled={eliminando}
+                                    className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleEliminar}
+                                    disabled={eliminando}
+                                    className="flex-1 py-2.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {eliminando ? (
+                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                        </svg>
+                                    ) : null}
+                                    Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Header ── */}
             <div className="flex items-start justify-between mb-6">
                 <div>
@@ -385,6 +526,7 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocume
                                 <th className="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">BILL OF LADING (BL)</th>
                                 <th className="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">FECHA ARRIBO</th>
                                 <th className="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">ESTADO ACTUAL</th>
+                                <th className="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">CANAL</th>
                                 <th className="px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">ACCIONES</th>
                             </tr>
                         </thead>
@@ -405,26 +547,60 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocume
                                     <td className="px-5 py-4">
                                         <EstadoBadge estado={d.estado} />
                                     </td>
-                                    <td className="px-5 py-4 text-center">
-                                        <BtnAcciones
-                                            despacho={d}
-                                            esCliente={esCliente}
-                                            onVerDetalle={onVerDetalle}
-                                            onDocumentacionLogistica={onDocumentacionLogistica}
-                                            onExtraerFactura={onExtraerFactura}
-                                            onVerTributos={onVerTributos}
-                                            onAdjuntarComprobantes={onAdjuntarComprobantes}
-                                            onValidarComprobantes={onValidarComprobantes}
-                                            onRegistrarNumeracion={onRegistrarNumeracion}
-                                            onObservacionesAforo={onObservacionesAforo}
-                                            onRegistrarLevante={onRegistrarLevante}
-                                            onComprobantesLogisticos={onComprobantesLogisticos}
-                                            onProgramarRetiro={onProgramarRetiro}
-                                            onConfirmarEntrega={onConfirmarEntrega}
-                                            onDevolucionContenedor={onDevolucionContenedor}
-                                            onLiquidacionFinal={onLiquidacionFinal}
-                                            onVerSeguimiento={onVerSeguimiento}
-                                        />
+                                    <td className="px-5 py-4">
+                                        {d.nombreCanal ? (
+                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                                d.nombreCanal === 'Verde'   ? 'bg-green-50 text-green-700' :
+                                                d.nombreCanal === 'Naranja' ? 'bg-orange-50 text-orange-700' :
+                                                d.nombreCanal === 'Rojo'    ? 'bg-red-50 text-red-700' :
+                                                'bg-gray-100 text-gray-600'
+                                            }`}>
+                                                {d.nombreCanal}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-300">—</span>
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-4">
+                                        <div className="flex items-center gap-2 justify-center">
+                                            {!esCliente && (
+                                                <>
+                                                    <button
+                                                        onClick={() => onEditarDespacho?.(d)}
+                                                        className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDespachoAEliminar(d)}
+                                                        className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                </>
+                                            )}
+                                            <BtnAcciones
+                                                despacho={d}
+                                                esCliente={esCliente}
+                                                onVerDetalle={onVerDetalle}
+                                                onDocumentacionLogistica={onDocumentacionLogistica}
+                                                onExtraerFactura={onExtraerFactura}
+                                                onVerBorradorDAM={onVerBorradorDAM}
+                                                onVerTributos={onVerTributos}
+                                                onAdjuntarComprobantes={onAdjuntarComprobantes}
+                                                onValidarComprobantes={onValidarComprobantes}
+                                                onRegistrarNumeracion={onRegistrarNumeracion}
+                                                onObservacionesAforo={onObservacionesAforo}
+                                                onRegistrarLevante={onRegistrarLevante}
+                                                onComprobantesLogisticos={onComprobantesLogisticos}
+                                                onValidarComprobantesLogisticos={onValidarComprobantesLogisticos}
+                                                onProgramarRetiro={onProgramarRetiro}
+                                                onConfirmarEntrega={onConfirmarEntrega}
+                                                onDevolucionContenedor={onDevolucionContenedor}
+                                                onLiquidacionFinal={onLiquidacionFinal}
+                                                onVerSeguimiento={onVerSeguimiento}
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
