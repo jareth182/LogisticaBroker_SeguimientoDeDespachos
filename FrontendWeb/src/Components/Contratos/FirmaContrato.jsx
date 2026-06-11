@@ -117,7 +117,7 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
         }),
       });
 
-      const updatedUser = { ...userData, estadoEmpresa: 'Afiliado Activo' };
+      const updatedUser = { ...userData, estadoEmpresa: 'Activo' };
       if (res.ok) {
         localStorage.setItem('usuario', JSON.stringify(updatedUser));
       } else {
@@ -127,7 +127,7 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
       setTimeout(() => { if (onFirmado) onFirmado(updatedUser); }, 2000);
     } catch {
       const userData    = JSON.parse(localStorage.getItem('usuario') || '{}');
-      const updatedUser = { ...userData, estadoEmpresa: 'Afiliado Activo' };
+      const updatedUser = { ...userData, estadoEmpresa: 'Activo' };
       localStorage.setItem('usuario', JSON.stringify(updatedUser));
       setFirmado(true);
       setTimeout(() => { if (onFirmado) onFirmado(updatedUser); }, 2000);
@@ -346,7 +346,7 @@ export default function FirmaContrato({ onFirmado, onCancelar }) {
                       </svg>
                       Procesando…
                     </span>
-                  ) : 'ACEPTAR Y FIRMAR'}
+                  ) : 'FIRMAR DOCUMENTO'}
                 </button>
               </div>
             </>

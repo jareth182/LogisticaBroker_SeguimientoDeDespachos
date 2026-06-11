@@ -193,7 +193,7 @@ export default function ListaDespachos({ onNuevoDespacho, onVerDetalle, onDocume
     const filtrados = despachos.filter(d => {
         const q = busquedaActiva.toLowerCase().trim();
         if (!q) return true;
-        return d.codigoBl?.toLowerCase().includes(q) || d.codigoOrden?.toLowerCase().includes(q);
+        return d.codigoBl?.toLowerCase().includes(q) || d.codigoOrden?.toLowerCase().includes(q) || d.razonSocial?.toLowerCase().includes(q) || d.ruc?.toLowerCase().includes(q);
     });
 
     /* Contadores exactos según CA HU07 */

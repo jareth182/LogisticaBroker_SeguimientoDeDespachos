@@ -126,7 +126,7 @@ export default function Login({ onLoginExitoso, onIrRecuperar, mensajeInicial = 
                         disabled={loading}
                         className={`w-full py-3 bg-[#1a2540] text-white font-semibold rounded-lg hover:bg-[#243050] transition-colors text-sm ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                     >
-                        {loading ? 'Autenticando...' : 'INICIAR SESION'}
+                        {loading ? 'Autenticando...' : 'INICIAR SESIÓN'}
                     </button>
 
                 </form>

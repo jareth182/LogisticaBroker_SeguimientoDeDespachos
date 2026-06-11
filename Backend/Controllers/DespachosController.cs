@@ -109,7 +109,7 @@ namespace LogisticaBroker.Controllers
                 CodigoOrden = nuevoCodigo,
                 Eta = dto.Eta,
                 Mercancia = dto.Mercancia,
-                Estado = "En Apertura", // Sobrescribe el valor por defecto "En proceso" del modelo
+                Estado = "Aperturado", // Sobrescribe el valor por defecto "En proceso" del modelo
                 FechaCreacion = DateTime.UtcNow
             };
 

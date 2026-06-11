@@ -335,7 +335,7 @@ export default function DespachoOperativo({ onVolver }) {
                                     </svg>
                                     Creando…
                                 </>
-                            ) : 'Crear Despacho'}
+                            ) : 'CONFIRMAR Y CREAR DESPACHO'}
                         </button>
                     </div>
                 </div>

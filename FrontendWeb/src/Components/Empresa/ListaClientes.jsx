@@ -110,7 +110,7 @@ export default function ListaClientes({ onNuevoCliente }) {
 
     const empresasFiltradas = empresas.filter(e => {
         const q = busqueda.toLowerCase().trim();
-        const coincideBusqueda = !q || e.razonSocial?.toLowerCase().includes(q) || e.ruc?.includes(q);
+        const coincideBusqueda = !q || e.razonSocial?.toLowerCase().includes(q) || e.ruc?.includes(q) || e.correo?.toLowerCase().includes(q) || e.nombreContacto?.toLowerCase().includes(q);
         const coincideFiltro = filtroEstado === 'Todos'
             || (filtroEstado === 'Activo' ? esActivo(e.estado) : e.estado === filtroEstado);
         return coincideBusqueda && coincideFiltro;
